@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Founder } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
@@ -201,8 +201,18 @@ function ManualRankRow({
   value: number;
   onChange: (v: number) => void;
 }) {
+  // Buffer the slider value locally during drag to prevent mid-drag re-sorts from
+  // repositioning the DOM element and breaking the native slider interaction.
+  const [localValue, setLocalValue] = useState(value);
+  const dragging = useRef(false);
+
+  // Sync parent value changes (e.g. after submit reset) only when not dragging.
+  useEffect(() => {
+    if (!dragging.current) setLocalValue(value);
+  }, [value]);
+
   const rankColor = rank === 1 ? '#fbbf24' : rank === 2 ? '#9ca3af' : rank === 3 ? '#d97706' : '#4a3820';
-  const scoreColor = value >= 8 ? '#ef4444' : value >= 5 ? '#f59e0b' : '#22c55e';
+  const scoreColor = localValue >= 8 ? '#ef4444' : localValue >= 5 ? '#f59e0b' : '#22c55e';
 
   return (
     <div style={{
@@ -248,8 +258,14 @@ function ManualRankRow({
             min={0}
             max={10}
             step={0.5}
-            value={value}
-            onChange={e => onChange(Number(e.target.value))}
+            value={localValue}
+            onChange={e => setLocalValue(Number(e.target.value))}
+            onPointerDown={() => { dragging.current = true; }}
+            onPointerUp={e => {
+              dragging.current = false;
+              onChange(Number((e.target as HTMLInputElement).value));
+            }}
+            onKeyUp={e => onChange(Number((e.target as HTMLInputElement).value))}
             style={{ flex: 1, accentColor: scoreColor, height: '4px' }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#5a4428', width: '100%', position: 'absolute', pointerEvents: 'none', visibility: 'hidden' }}>
@@ -265,7 +281,7 @@ function ManualRankRow({
 
       <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '52px' }}>
         <div style={{ fontSize: '22px', fontWeight: 700, color: scoreColor, lineHeight: 1 }}>
-          {value.toFixed(1)}
+          {localValue.toFixed(1)}
         </div>
         <div style={{ fontSize: '10px', color: '#5a4428' }}>🥃</div>
       </div>
