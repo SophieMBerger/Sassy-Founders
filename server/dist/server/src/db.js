@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getDb = getDb;
+exports.computeEloRatings = computeEloRatings;
 const better_sqlite3_1 = __importDefault(require("better-sqlite3"));
 const path_1 = __importDefault(require("path"));
 const DB_PATH = path_1.default.join(__dirname, '../../data/sassy.db');
@@ -42,7 +43,28 @@ function initSchema(db) {
       whiskey_units REAL NOT NULL CHECK(whiskey_units >= 0 AND whiskey_units <= 10),
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS pairwise_votes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      winner_id INTEGER NOT NULL REFERENCES founders(id),
+      loser_id INTEGER NOT NULL REFERENCES founders(id),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
+}
+function computeEloRatings(db) {
+    const founderIds = db.prepare('SELECT id FROM founders').all().map(r => r.id);
+    const ratings = new Map(founderIds.map(id => [id, 1500]));
+    const votes = db.prepare('SELECT winner_id, loser_id FROM pairwise_votes ORDER BY created_at ASC').all();
+    for (const { winner_id, loser_id } of votes) {
+        const rW = ratings.get(winner_id) ?? 1500;
+        const rL = ratings.get(loser_id) ?? 1500;
+        const expected = 1 / (1 + Math.pow(10, (rL - rW) / 400));
+        const K = 32;
+        ratings.set(winner_id, rW + K * (1 - expected));
+        ratings.set(loser_id, rL - K * expected);
+    }
+    return ratings;
 }
 function seedFounders(db) {
     const count = db.prepare('SELECT COUNT(*) as c FROM founders').get().c;

@@ -29,7 +29,45 @@ function toFounder(row) {
 router.get('/founders', (_req, res) => {
     const db = (0, db_1.getDb)();
     const rows = db.prepare('SELECT * FROM founders ORDER BY sassy_score DESC').all();
-    res.json({ founders: rows.map(toFounder), total: rows.length });
+    const eloRatings = (0, db_1.computeEloRatings)(db);
+    const founders = rows.map(row => ({
+        ...toFounder(row),
+        eloScore: Math.round((eloRatings.get(row.id) ?? 1500) * 10) / 10,
+    }));
+    res.json({ founders, total: rows.length });
+});
+// GET /api/founders/pair — return two random founders for pairwise comparison
+router.get('/founders/pair', (_req, res) => {
+    const db = (0, db_1.getDb)();
+    const rows = db.prepare('SELECT * FROM founders').all();
+    if (rows.length < 2) {
+        res.status(400).json({ error: 'Not enough founders' });
+        return;
+    }
+    const shuffled = [...rows].sort(() => Math.random() - 0.5);
+    const [a, b] = shuffled;
+    res.json({ founders: [toFounder(a), toFounder(b)] });
+});
+// POST /api/pairwise/vote — record a pairwise vote
+router.post('/pairwise/vote', (req, res) => {
+    const db = (0, db_1.getDb)();
+    const { winnerId, loserId } = req.body;
+    if (!winnerId || !loserId || winnerId === loserId) {
+        res.status(400).json({ error: 'winnerId and loserId must be different valid founder ids' });
+        return;
+    }
+    const winner = db.prepare('SELECT id FROM founders WHERE id = ?').get(winnerId);
+    const loser = db.prepare('SELECT id FROM founders WHERE id = ?').get(loserId);
+    if (!winner || !loser) {
+        res.status(404).json({ error: 'Founder not found' });
+        return;
+    }
+    db.prepare('INSERT INTO pairwise_votes (winner_id, loser_id) VALUES (?, ?)').run(winnerId, loserId);
+    const eloRatings = (0, db_1.computeEloRatings)(db);
+    res.json({
+        winnerElo: Math.round((eloRatings.get(Number(winnerId)) ?? 1500) * 10) / 10,
+        loserElo: Math.round((eloRatings.get(Number(loserId)) ?? 1500) * 10) / 10,
+    });
 });
 // GET /api/founders/:id — founder detail
 router.get('/founders/:id', (req, res) => {

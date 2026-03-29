@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { FounderDetailResponse } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
+import { ArrowLeft, BarChart3, Loader2, Users } from 'lucide-react';
 
 export default function FounderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -40,167 +45,141 @@ export default function FounderDetail() {
   }
 
   if (loading) return (
-    <div style={{ textAlign: 'center', padding: '60px', color: '#9d8460' }}>
-      <div style={{ fontSize: '48px' }}>🥃</div>
-      <p>Loading...</p>
+    <div className="flex flex-col items-center justify-center py-20 text-zinc-600 gap-3">
+      <div className="text-5xl">🥃</div>
+      <p className="text-sm">Loading...</p>
     </div>
   );
 
   if (error || !founder) return (
-    <div style={{ textAlign: 'center', padding: '60px' }}>
-      <div style={{ fontSize: '48px' }}>💀</div>
-      <p style={{ color: '#ef4444' }}>{error}</p>
-      <Link to="/" style={{ display: 'inline-block', marginTop: '16px' }}>← Back to leaderboard</Link>
+    <div className="flex flex-col items-center justify-center py-20 gap-4">
+      <div className="text-5xl">💀</div>
+      <p className="text-sm text-red-400">{error}</p>
+      <Link to="/" className="text-sm">← Back to leaderboard</Link>
     </div>
   );
 
   const breakdown = founder.scoreBreakdown;
+  const scoreColor =
+    founder.sassyScore >= 8 ? 'text-red-400' : founder.sassyScore >= 5 ? 'text-amber-400' : 'text-emerald-400';
 
   return (
-    <div>
-      <Link to="/" style={{ fontSize: '13px', color: '#9d8460', display: 'inline-block', marginBottom: '20px' }}>
-        ← Back to leaderboard
+    <div className="space-y-4">
+      <Link to="/" className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors no-underline">
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Back to leaderboard
       </Link>
 
-      <div style={{
-        background: '#1a1208',
-        border: '1px solid #3d2e10',
-        borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '20px',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ fontSize: '26px', fontWeight: 700, color: '#fbbf24' }}>{founder.name}</h2>
-            <p style={{ color: '#9d8460', fontSize: '14px', marginTop: '2px' }}>
-              {founder.title} · {founder.company}
-            </p>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{
-              fontSize: '48px',
-              fontWeight: 700,
-              color: founder.sassyScore >= 8 ? '#ef4444' : founder.sassyScore >= 5 ? '#f59e0b' : '#22c55e',
-              lineHeight: 1,
-            }}>
-              {founder.sassyScore.toFixed(1)}
+      {/* Profile Card */}
+      <Card>
+        <CardContent className="pt-5 pb-5">
+          <div className="flex justify-between items-start gap-4 flex-wrap mb-4">
+            <div>
+              <h2 className="text-2xl font-bold text-amber-300">{founder.name}</h2>
+              <p className="text-sm text-zinc-500 mt-0.5">
+                {founder.title} · {founder.company}
+              </p>
             </div>
-            <div style={{ fontSize: '12px', color: '#5a4428', marginTop: '4px' }}>🥃 official score</div>
+            <div className="text-right">
+              <div className={cn('text-5xl font-bold leading-none', scoreColor)}>
+                {founder.sassyScore.toFixed(1)}
+              </div>
+              <div className="text-xs text-zinc-600 mt-1">🥃 official score</div>
+            </div>
           </div>
-        </div>
-
-        <p style={{ color: '#c4a87a', fontSize: '14px', marginTop: '16px', lineHeight: 1.6 }}>
-          {founder.bio}
-        </p>
-      </div>
+          <Separator className="mb-4" />
+          <p className="text-sm text-zinc-400 leading-relaxed">{founder.bio}</p>
+        </CardContent>
+      </Card>
 
       {/* Score Breakdown */}
-      <div style={{
-        background: '#1a1208',
-        border: '1px solid #3d2e10',
-        borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '20px',
-      }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#fbbf24', marginBottom: '16px' }}>
-          📊 Sassy Score Breakdown
-        </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BarChart3 className="w-4 h-4 text-amber-500" />
+            Sassy Score Breakdown
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
           <WhiskeyBar score={breakdown.arrogance} label="Arrogance" />
           <WhiskeyBar score={breakdown.controversialTakes} label="Controversial Takes" />
           <WhiskeyBar score={breakdown.interruptionTendency} label="Interruption Tendency" />
           <WhiskeyBar score={breakdown.humblebragging} label="Humblebragging" />
           <WhiskeyBar score={breakdown.buzzwordDensity} label="Buzzword Density" />
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Community Vote */}
-      <div style={{
-        background: '#1a1208',
-        border: '1px solid #3d2e10',
-        borderRadius: '12px',
-        padding: '20px',
-        marginBottom: '20px',
-      }}>
-        <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#fbbf24', marginBottom: '4px' }}>
-          🗳️ Submit Your Rating
-        </h3>
-        <p style={{ color: '#9d8460', fontSize: '13px', marginBottom: '16px' }}>
-          How many 🥃 units would you need to enjoy a conversation with {founder.name.split(' ')[0]}?
-        </p>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Users className="w-4 h-4 text-amber-500" />
+            Submit Your Rating
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-zinc-500">
+            How many 🥃 units would you need to enjoy a conversation with {founder.name.split(' ')[0]}?
+          </p>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ flex: 1, minWidth: '200px' }}>
-            <input
-              type="range"
-              min={0}
-              max={10}
-              step={0.5}
-              value={vote}
-              onChange={e => setVote(Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#d97706' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#5a4428', marginTop: '2px' }}>
-              <span>0 (delightful)</span>
-              <span>5 (tolerable)</span>
-              <span>10 (send help)</span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '24px', fontWeight: 700, color: '#fbbf24', minWidth: '40px', textAlign: 'center' }}>
-              {vote}
-            </span>
-            <button
-              onClick={handleVote}
-              disabled={voting}
-              style={{
-                padding: '8px 18px',
-                background: voting ? '#3d2e10' : '#d97706',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 600,
-                fontSize: '14px',
-                opacity: voting ? 0.6 : 1,
-              }}
-            >
-              {voting ? '...' : 'Submit'}
-            </button>
-          </div>
-        </div>
-
-        {voteSuccess && (
-          <div style={{ marginTop: '12px', padding: '8px 12px', background: '#14532d', borderRadius: '8px', fontSize: '13px', color: '#4ade80' }}>
-            ✓ Vote submitted! Thanks for rating.
-          </div>
-        )}
-
-        {founder.communityVoteCount > 0 && (
-          <div style={{
-            marginTop: '16px',
-            padding: '12px',
-            background: '#0f0a04',
-            borderRadius: '8px',
-            display: 'flex',
-            gap: '20px',
-            flexWrap: 'wrap',
-          }}>
-            <div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#fbbf24' }}>
-                {founder.communityScore?.toFixed(1) ?? 'n/a'}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px]">
+              <input
+                type="range"
+                min={0}
+                max={10}
+                step={0.5}
+                value={vote}
+                onChange={e => setVote(Number(e.target.value))}
+                className="w-full"
+              />
+              <div className="flex justify-between text-[11px] text-zinc-700 mt-1">
+                <span>0 (delightful)</span>
+                <span>5 (tolerable)</span>
+                <span>10 (send help)</span>
               </div>
-              <div style={{ fontSize: '11px', color: '#5a4428' }}>community avg</div>
             </div>
-            <div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#c4a87a' }}>
-                {founder.communityVoteCount}
-              </div>
-              <div style={{ fontSize: '11px', color: '#5a4428' }}>total votes</div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-bold text-amber-400 w-10 text-center">{vote}</span>
+              <Button
+                variant="amber"
+                size="sm"
+                onClick={handleVote}
+                disabled={voting}
+              >
+                {voting ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />...</> : 'Submit'}
+              </Button>
             </div>
           </div>
-        )}
-      </div>
+
+          {voteSuccess && (
+            <div className="px-3 py-2 bg-emerald-950/60 border border-emerald-800/40 rounded-lg text-sm text-emerald-400">
+              ✓ Vote submitted! Thanks for rating.
+            </div>
+          )}
+
+          {founder.communityVoteCount > 0 && (
+            <>
+              <Separator />
+              <div className="flex gap-6 flex-wrap">
+                <div>
+                  <div className="text-xl font-bold text-amber-400">
+                    {founder.communityScore?.toFixed(1) ?? 'n/a'}
+                  </div>
+                  <div className="text-xs text-zinc-600">community avg</div>
+                </div>
+                <div>
+                  <div className="text-xl font-bold text-zinc-300">
+                    {founder.communityVoteCount}
+                  </div>
+                  <div className="text-xs text-zinc-600">total votes</div>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

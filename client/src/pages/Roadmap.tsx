@@ -1,11 +1,16 @@
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Map } from 'lucide-react';
+
 export default function Roadmap() {
   return (
-    <div>
-      <div style={{ marginBottom: '28px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#fbbf24', marginBottom: '4px' }}>
-          🗺️ Product Roadmap
-        </h2>
-        <p style={{ color: '#9d8460', fontSize: '14px' }}>
+    <div className="space-y-5">
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <Map className="w-5 h-5 text-amber-500" />
+          <h2 className="text-xl font-bold text-amber-100">Product Roadmap</h2>
+        </div>
+        <p className="text-sm text-zinc-500">
           Future improvements to Sassy Founders, ranked by whiskey ambition.
         </p>
       </div>
@@ -57,31 +62,28 @@ export default function Roadmap() {
         ]}
       />
 
-      <div style={{
-        background: '#1a1208',
-        border: '1px solid #3d2e10',
-        borderRadius: '12px',
-        padding: '20px 24px',
-        marginTop: '8px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-          <span style={{ fontSize: '20px' }}>📋</span>
-          <span style={{ fontWeight: 700, fontSize: '16px', color: '#9d8460' }}>Backlog / Nice-to-Haves</span>
-        </div>
-        <ul style={{ margin: 0, padding: '0 0 0 20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {[
-            'Mobile app (iOS/Android)',
-            'Podcast episode integrations (auto-score founder appearances)',
-            'Debate mode: two founders go head-to-head on a hot take; community votes on who was sassier',
-            'Investor sassiness index: rate the VCs, not just the founders',
-            'Dark mode / theming options',
-          ].map(item => (
-            <li key={item} style={{ color: '#5a4428', fontSize: '13px', lineHeight: 1.5 }}>
-              {item}
-            </li>
-          ))}
-        </ul>
-      </div>
+      {/* Backlog */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base text-zinc-400">
+            <span>📋</span>
+            Backlog / Nice-to-Haves
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-1.5 pl-4 list-disc marker:text-zinc-700">
+            {[
+              'Mobile app (iOS/Android)',
+              'Podcast episode integrations (auto-score founder appearances)',
+              'Debate mode: two founders go head-to-head on a hot take; community votes on who was sassier',
+              'Investor sassiness index: rate the VCs, not just the founders',
+              'Dark mode / theming options',
+            ].map(item => (
+              <li key={item} className="text-sm text-zinc-600 leading-relaxed">{item}</li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -98,46 +100,25 @@ function RoadmapSection({
   items: { title: string; desc: string }[];
 }) {
   return (
-    <div style={{
-      background: '#1a1208',
-      border: '1px solid #3d2e10',
-      borderRadius: '12px',
-      padding: '20px 24px',
-      marginBottom: '16px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <span style={{
-          background: '#2d1a05',
-          border: '1px solid #d97706',
-          borderRadius: '6px',
-          padding: '3px 10px',
-          fontSize: '12px',
-          fontWeight: 700,
-          color: '#d97706',
-          letterSpacing: '0.5px',
-        }}>
-          {version}
-        </span>
-        <span style={{ fontSize: '20px' }}>{emoji}</span>
-        <span style={{ fontWeight: 700, fontSize: '16px', color: '#fbbf24' }}>{title}</span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2.5">
+          <Badge variant="outline" className="text-xs font-mono">{version}</Badge>
+          <span>{emoji}</span>
+          <span className="text-base">{title}</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2.5">
         {items.map(item => (
-          <div key={item.title} style={{
-            background: '#130e06',
-            borderRadius: '8px',
-            padding: '12px 14px',
-            borderLeft: '3px solid #3d2e10',
-          }}>
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#f5e6c8', marginBottom: '4px' }}>
-              {item.title}
-            </div>
-            <div style={{ fontSize: '13px', color: '#9d8460', lineHeight: 1.5 }}>
-              {item.desc}
-            </div>
+          <div
+            key={item.title}
+            className="bg-zinc-950/60 rounded-lg px-3.5 py-2.5 border-l-2 border-amber-900/50"
+          >
+            <div className="font-semibold text-sm text-zinc-200 mb-0.5">{item.title}</div>
+            <div className="text-xs text-zinc-500 leading-relaxed">{item.desc}</div>
           </div>
         ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

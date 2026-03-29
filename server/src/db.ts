@@ -50,6 +50,59 @@ function initSchema(db: Database.Database) {
   `);
 }
 
+// Maps founder names to Wikipedia article titles for image lookup
+const WIKIPEDIA_TITLES: Record<string, string> = {
+  'Elon Musk': 'Elon_Musk',
+  'Mark Zuckerberg': 'Mark_Zuckerberg',
+  'Sam Altman': 'Sam_Altman',
+  'Travis Kalanick': 'Travis_Kalanick',
+  'Adam Neumann': 'Adam_Neumann',
+  'Peter Thiel': 'Peter_Thiel',
+  'Gary Vaynerchuk': 'Gary_Vaynerchuk',
+  'Elizabeth Holmes': 'Elizabeth_Holmes',
+  'Jack Dorsey': 'Jack_Dorsey',
+  'Balaji Srinivasan': 'Balaji_Srinivasan',
+  'Jeff Bezos': 'Jeff_Bezos',
+  'Reid Hoffman': 'Reid_Hoffman',
+  'Marc Andreessen': 'Marc_Andreessen',
+  'Chamath Palihapitiya': 'Chamath_Palihapitiya',
+  'Naval Ravikant': 'Naval_Ravikant',
+  'Alexis Ohanian': 'Alexis_Ohanian',
+  'Steve Jobs': 'Steve_Jobs',
+  'Larry Ellison': 'Larry_Ellison',
+  'Patrick Collison': 'Patrick_Collison',
+  'Yann LeCun': 'Yann_LeCun',
+};
+
+export async function updateFounderImages(): Promise<void> {
+  const db = getDb();
+  const founders = db.prepare('SELECT id, name, image_url FROM founders WHERE image_url IS NULL').all() as {
+    id: number;
+    name: string;
+    image_url: string | null;
+  }[];
+
+  for (const founder of founders) {
+    const wikiTitle = WIKIPEDIA_TITLES[founder.name];
+    if (!wikiTitle) continue;
+
+    try {
+      const resp = await fetch(
+        `https://en.wikipedia.org/api/rest_v1/page/summary/${wikiTitle}`,
+        { headers: { 'User-Agent': 'SassyFounders/0.1 (educational satire site)' } }
+      );
+      if (!resp.ok) continue;
+      const data = await resp.json() as { thumbnail?: { source: string } };
+      if (data.thumbnail?.source) {
+        db.prepare('UPDATE founders SET image_url = ? WHERE id = ?').run(data.thumbnail.source, founder.id);
+        console.log(`[images] Updated image for ${founder.name}`);
+      }
+    } catch {
+      // Non-fatal: image fetch failed, will retry next startup
+    }
+  }
+}
+
 export function computeEloRatings(db: Database.Database): Map<number, number> {
   const founderIds = (db.prepare('SELECT id FROM founders').all() as { id: number }[]).map(r => r.id);
   const ratings = new Map<number, number>(founderIds.map(id => [id, 1500]));
