@@ -44,13 +44,9 @@ export async function initSchema(): Promise<void> {
     CREATE TABLE IF NOT EXISTS community_votes (
       id SERIAL PRIMARY KEY,
       founder_id INTEGER NOT NULL REFERENCES founders(id),
-      user_id INTEGER REFERENCES users(id),
       whiskey_units FLOAT NOT NULL CHECK(whiskey_units >= 0 AND whiskey_units <= 10),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_community_votes_user_founder
-      ON community_votes(user_id, founder_id) WHERE user_id IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS pairwise_votes (
       id SERIAL PRIMARY KEY,
@@ -58,8 +54,50 @@ export async function initSchema(): Promise<void> {
       loser_id INTEGER NOT NULL REFERENCES founders(id),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      stripe_customer_id TEXT,
+      stripe_subscription_id TEXT,
+      status TEXT NOT NULL DEFAULT 'inactive',
+      plan TEXT,
+      current_period_end TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(user_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS score_history (
+      id SERIAL PRIMARY KEY,
+      founder_id INTEGER NOT NULL REFERENCES founders(id) ON DELETE CASCADE,
+      sassy_score NUMERIC(4,1) NOT NULL,
+      community_score NUMERIC(5,2),
+      elo_score NUMERIC(8,2),
+      recorded_at DATE NOT NULL DEFAULT CURRENT_DATE,
+      UNIQUE(founder_id, recorded_at)
+    );
   `);
+
+  // Additive migrations for tables that may already exist without these columns
+  await db.query(`
+    ALTER TABLE community_votes ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
+  `);
+  await db.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_community_votes_user_founder
+      ON community_votes(user_id, founder_id) WHERE user_id IS NOT NULL;
+  `);
+
   await seedFounders(db);
+  await seedScoreHistory(db);
+}
+
+export async function isUserPremium(userId: number): Promise<boolean> {
+  const db = getPool();
+  const { rows } = await db.query<{ status: string }>(
+    'SELECT status FROM subscriptions WHERE user_id = $1',
+    [userId]
+  );
+  return rows[0]?.status === 'active';
 }
 
 // Maps founder names to Wikipedia article titles for image lookup
@@ -176,4 +214,41 @@ async function seedFounders(db: Pool): Promise<void> {
     );
   }
   console.log('[db] Seeded founders');
+}
+
+async function seedScoreHistory(db: Pool): Promise<void> {
+  const { rows: existing } = await db.query('SELECT COUNT(*) as c FROM score_history');
+  if (Number(existing[0].c) > 0) return;
+
+  const { rows: founders } = await db.query<{ id: number; sassy_score: number }>(
+    'SELECT id, sassy_score FROM founders'
+  );
+  if (founders.length === 0) return;
+
+  // Generate 30 days of mock history with small random walks
+  const now = new Date();
+  for (const founder of founders) {
+    let score = founder.sassy_score;
+    let communityScore = Math.max(1, score - 1 + Math.random() * 2);
+    let eloScore = 1500 + (Math.random() - 0.5) * 200;
+
+    for (let daysAgo = 29; daysAgo >= 0; daysAgo--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - daysAgo);
+      const dateStr = date.toISOString().split('T')[0];
+
+      // Small random walk — scores drift up to ±0.3 per day
+      score = Math.min(10, Math.max(0, score + (Math.random() - 0.5) * 0.3));
+      communityScore = Math.min(10, Math.max(0, communityScore + (Math.random() - 0.5) * 0.4));
+      eloScore = Math.max(1000, Math.min(2200, eloScore + (Math.random() - 0.5) * 20));
+
+      await db.query(
+        `INSERT INTO score_history (founder_id, sassy_score, community_score, elo_score, recorded_at)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (founder_id, recorded_at) DO NOTHING`,
+        [founder.id, Math.round(score * 10) / 10, Math.round(communityScore * 100) / 100, Math.round(eloScore * 10) / 10, dateStr]
+      );
+    }
+  }
+  console.log('[db] Seeded score history (30 days)');
 }
