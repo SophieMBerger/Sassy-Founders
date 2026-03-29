@@ -41,4 +41,17 @@ export interface AuthUser {
   email: string | null;
   avatarUrl: string | null;
   provider: string;
+  isPremium?: boolean;
+}
+
+export interface ScoreHistoryPoint {
+  date: string;
+  sassyScore: number;
+  communityScore: number | null;
+  eloScore: number | null;
+}
+
+export interface FounderHistoryEntry {
+  name: string;
+  history: ScoreHistoryPoint[];
 }

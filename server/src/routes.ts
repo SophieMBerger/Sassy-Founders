@@ -1,8 +1,32 @@
 import { Router, Request, Response } from 'express';
-import { getPool, computeEloRatings } from './db';
+import { getPool, computeEloRatings, isUserPremium } from './db';
 import { getAuthUser } from './auth';
 
 const router = Router();
+
+// In-memory daily pairwise vote tracker for rate limiting (keyed by IP)
+const FREE_DAILY_PAIRWISE_LIMIT = 10;
+type DayCount = { date: string; count: number };
+const pairwiseDailyTracker = new Map<string, DayCount>();
+
+function checkAndIncrementPairwiseLimit(ip: string): boolean {
+  const today = new Date().toISOString().split('T')[0];
+  const entry = pairwiseDailyTracker.get(ip);
+  if (!entry || entry.date !== today) {
+    pairwiseDailyTracker.set(ip, { date: today, count: 1 });
+    return true;
+  }
+  if (entry.count >= FREE_DAILY_PAIRWISE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
+function getPairwiseRemaining(ip: string): number {
+  const today = new Date().toISOString().split('T')[0];
+  const entry = pairwiseDailyTracker.get(ip);
+  if (!entry || entry.date !== today) return FREE_DAILY_PAIRWISE_LIMIT;
+  return Math.max(0, FREE_DAILY_PAIRWISE_LIMIT - entry.count);
+}
 
 async function toFounder(row: Record<string, unknown>) {
   const db = getPool();
@@ -76,6 +100,22 @@ router.post('/pairwise/vote', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'winnerId and loserId must be different valid founder ids' });
       return;
     }
+
+    // Rate limiting: premium users get unlimited votes; free users get FREE_DAILY_PAIRWISE_LIMIT/day
+    const user = getAuthUser(req);
+    const isPremium = user ? await isUserPremium(user.id) : false;
+    if (!isPremium) {
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket.remoteAddress ?? 'unknown';
+      const allowed = checkAndIncrementPairwiseLimit(ip);
+      if (!allowed) {
+        res.status(429).json({
+          error: `Daily limit reached. Upgrade to Sipster Club for unlimited voting!`,
+          upgradeUrl: '/upgrade',
+        });
+        return;
+      }
+    }
+
     const winner = await db.query('SELECT id FROM founders WHERE id = $1', [winnerId]);
     const loser = await db.query('SELECT id FROM founders WHERE id = $1', [loserId]);
     if (!winner.rows[0] || !loser.rows[0]) {
@@ -84,9 +124,15 @@ router.post('/pairwise/vote', async (req: Request, res: Response) => {
     }
     await db.query('INSERT INTO pairwise_votes (winner_id, loser_id) VALUES ($1, $2)', [winnerId, loserId]);
     const eloRatings = await computeEloRatings(db);
+
+    // Return remaining votes for free users
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ?? req.socket.remoteAddress ?? 'unknown';
+    const remaining = isPremium ? null : getPairwiseRemaining(ip);
+
     res.json({
       winnerElo: Math.round((eloRatings.get(Number(winnerId)) ?? 1500) * 10) / 10,
       loserElo: Math.round((eloRatings.get(Number(loserId)) ?? 1500) * 10) / 10,
+      votesRemaining: remaining,
     });
   } catch (err) {
     console.error(err);
@@ -163,6 +209,59 @@ router.post('/founders/:id/vote', async (req: Request, res: Response) => {
 
     const { rows: updatedRows } = await db.query('SELECT * FROM founders WHERE id = $1', [req.params.id]);
     res.json(await toFounder(updatedRows[0]));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/founders/history — historical score trends (premium only)
+router.get('/founders/history', async (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  if (!user) {
+    res.status(401).json({ error: 'Sign in required' });
+    return;
+  }
+  const isPremium = await isUserPremium(user.id);
+  if (!isPremium) {
+    res.status(403).json({ error: 'Sipster Club membership required', upgradeUrl: '/upgrade' });
+    return;
+  }
+
+  try {
+    const db = getPool();
+    const days = Math.min(Number(req.query.days ?? 30), 90);
+    const { rows } = await db.query<{
+      founder_id: number;
+      name: string;
+      recorded_at: string;
+      sassy_score: number;
+      community_score: number | null;
+      elo_score: number | null;
+    }>(
+      `SELECT sh.founder_id, f.name, sh.recorded_at, sh.sassy_score, sh.community_score, sh.elo_score
+       FROM score_history sh
+       JOIN founders f ON f.id = sh.founder_id
+       WHERE sh.recorded_at >= CURRENT_DATE - $1::int
+       ORDER BY sh.founder_id, sh.recorded_at ASC`,
+      [days]
+    );
+
+    // Group by founder
+    const byFounder = new Map<number, { name: string; history: object[] }>();
+    for (const row of rows) {
+      if (!byFounder.has(row.founder_id)) {
+        byFounder.set(row.founder_id, { name: row.name, history: [] });
+      }
+      byFounder.get(row.founder_id)!.history.push({
+        date: row.recorded_at,
+        sassyScore: row.sassy_score,
+        communityScore: row.community_score,
+        eloScore: row.elo_score,
+      });
+    }
+
+    res.json({ founders: Object.fromEntries(byFounder) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

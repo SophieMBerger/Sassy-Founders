@@ -2,10 +2,12 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import Leaderboard from './pages/Leaderboard';
 import FounderDetail from './pages/FounderDetail';
 import Roadmap from './pages/Roadmap';
+import Upgrade from './pages/Upgrade';
 import Disclaimer from './components/Disclaimer';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginModal from './components/LoginModal';
 import { cn } from '@/lib/utils';
+import { Crown } from 'lucide-react';
 import { useState } from 'react';
 
 function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
@@ -22,6 +24,20 @@ function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
       )}
     >
       {children}
+    </Link>
+  );
+}
+
+function UpgradeButton() {
+  const { user, loading } = useAuth();
+  if (loading || user?.isPremium) return null;
+  return (
+    <Link
+      to="/upgrade"
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-amber-400 border border-amber-500/30 bg-amber-500/8 hover:bg-amber-500/15 transition-all no-underline"
+    >
+      <Crown className="w-3 h-3" />
+      Upgrade
     </Link>
   );
 }
@@ -108,6 +124,7 @@ function AppInner() {
           <nav className="flex items-center gap-1">
             <NavLink to="/">Leaderboard</NavLink>
             <NavLink to="/roadmap">Roadmap</NavLink>
+            <UpgradeButton />
             <AuthButton />
           </nav>
         </div>
@@ -120,6 +137,8 @@ function AppInner() {
           <Route path="/" element={<Leaderboard />} />
           <Route path="/founders/:id" element={<FounderDetail />} />
           <Route path="/roadmap" element={<Roadmap />} />
+          <Route path="/upgrade" element={<Upgrade />} />
+          <Route path="/upgrade/success" element={<Upgrade />} />
         </Routes>
       </main>
 

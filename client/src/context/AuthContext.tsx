@@ -6,7 +6,6 @@ interface AuthContextValue {
   loading: boolean;
   logout: () => Promise<void>;
   loginWithGoogle: () => void;
-  loginWithGitHub: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -31,12 +30,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = '/api/auth/google';
   }, []);
 
-  const loginWithGitHub = useCallback(() => {
-    window.location.href = '/api/auth/github';
-  }, []);
-
   return (
-    <AuthContext.Provider value={{ user, loading, logout, loginWithGoogle, loginWithGitHub }}>
+    <AuthContext.Provider value={{ user, loading, logout, loginWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );

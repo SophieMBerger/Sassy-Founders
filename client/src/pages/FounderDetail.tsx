@@ -3,10 +3,12 @@ import { useParams, Link } from 'react-router-dom';
 import type { FounderDetailResponse } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
 import CarbonAd from '../components/CarbonAd';
+import PremiumGate from '../components/PremiumGate';
+import ShareableCard from '../components/ShareableCard';
 import LoginModal from '../components/LoginModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, BarChart3, Loader2, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, Loader2, Share2, Users } from 'lucide-react';
 
 const BREAKDOWN_LABELS: Record<string, string> = {
   arrogance: 'Arrogance',
@@ -142,8 +144,21 @@ export default function FounderDetail() {
         </div>
       </div>
 
-      {/* Ad unit — between score breakdown and community vote */}
-      <CarbonAd />
+      {/* Ad unit — hidden for Sipster Club members */}
+      <CarbonAd hide={!!user?.isPremium} />
+
+      {/* Shareable Card — Sipster Club exclusive */}
+      <div className="rounded-3xl bg-zinc-900/40 border border-white/[0.05] p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+            <Share2 className="w-3.5 h-3.5 text-amber-500" />
+          </div>
+          <h3 className="font-bold text-sm text-zinc-200">Shareable Whiskey Card</h3>
+        </div>
+        <PremiumGate featureLabel="shareable infographic cards">
+          <ShareableCard founder={founder} />
+        </PremiumGate>
+      </div>
 
       {/* Community Vote */}
       <div className="rounded-3xl bg-zinc-900/40 border border-white/[0.05] p-6">

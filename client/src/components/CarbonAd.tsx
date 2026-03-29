@@ -6,8 +6,10 @@ const PLACEMENT = import.meta.env.VITE_CARBON_ADS_PLACEMENT;
 /**
  * Carbon Ads unit. Set VITE_CARBON_ADS_SERVE and VITE_CARBON_ADS_PLACEMENT
  * in your .env to activate live ads. Falls back to a placeholder banner.
+ * Pass `hide` to suppress the ad (e.g. for Sipster Club premium members).
  */
-export default function CarbonAd({ className = '' }: { className?: string }) {
+export default function CarbonAd({ className = '', hide = false }: { className?: string; hide?: boolean }) {
+  if (hide) return null;
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
