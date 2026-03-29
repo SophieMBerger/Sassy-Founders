@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { FounderDetailResponse } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
+import CarbonAd from '../components/CarbonAd';
 import LoginModal from '../components/LoginModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '@/lib/utils';
@@ -140,6 +141,9 @@ export default function FounderDetail() {
           ))}
         </div>
       </div>
+
+      {/* Ad unit — between score breakdown and community vote */}
+      <CarbonAd />
 
       {/* Community Vote */}
       <div className="rounded-3xl bg-zinc-900/40 border border-white/[0.05] p-6">

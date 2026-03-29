@@ -139,3 +139,57 @@ input[type='range']::-webkit-slider-thumb:hover {
 .animate-pulse-glow {
   animation: pulse-glow 3s ease-in-out infinite;
 }
+
+/* Carbon Ads — dark theme overrides */
+#carbonads {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(24,24,27,0.6);
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 100%;
+}
+
+#carbonads a {
+  color: #a1a1aa;
+  text-decoration: none;
+}
+
+#carbonads a:hover {
+  color: #d4d4d8;
+}
+
+#carbonads .carbon-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+#carbonads .carbon-img img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+#carbonads .carbon-text {
+  flex: 1;
+  min-width: 0;
+  color: #a1a1aa;
+}
+
+#carbonads .carbon-poweredby {
+  display: block;
+  font-size: 10px;
+  color: #52525b;
+  margin-top: 4px;
+  white-space: nowrap;
+}

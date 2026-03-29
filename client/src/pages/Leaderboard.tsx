@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Founder } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
+import CarbonAd from '../components/CarbonAd';
 import { cn } from '@/lib/utils';
 import { BarChart3, Users, Flame, ChevronRight, LayoutGrid } from 'lucide-react';
 
@@ -102,6 +103,9 @@ export default function Leaderboard() {
           </button>
         ))}
       </div>
+
+      {/* Ad unit — below mode selector, above content */}
+      <CarbonAd />
 
       {/* Content */}
       {viewMode === 'pairwise' ? (
