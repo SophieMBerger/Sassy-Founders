@@ -5,3 +5,5 @@ dist/
 *.db-wal
 data/
 .env
+.vercel
+.env*.local
