@@ -40,7 +40,35 @@ function initSchema(db: Database.Database) {
       whiskey_units REAL NOT NULL CHECK(whiskey_units >= 0 AND whiskey_units <= 10),
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS pairwise_votes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      winner_id INTEGER NOT NULL REFERENCES founders(id),
+      loser_id INTEGER NOT NULL REFERENCES founders(id),
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
+}
+
+export function computeEloRatings(db: Database.Database): Map<number, number> {
+  const founderIds = (db.prepare('SELECT id FROM founders').all() as { id: number }[]).map(r => r.id);
+  const ratings = new Map<number, number>(founderIds.map(id => [id, 1500]));
+
+  const votes = db.prepare('SELECT winner_id, loser_id FROM pairwise_votes ORDER BY created_at ASC').all() as {
+    winner_id: number;
+    loser_id: number;
+  }[];
+
+  for (const { winner_id, loser_id } of votes) {
+    const rW = ratings.get(winner_id) ?? 1500;
+    const rL = ratings.get(loser_id) ?? 1500;
+    const expected = 1 / (1 + Math.pow(10, (rL - rW) / 400));
+    const K = 32;
+    ratings.set(winner_id, rW + K * (1 - expected));
+    ratings.set(loser_id, rL - K * expected);
+  }
+
+  return ratings;
 }
 
 function seedFounders(db: Database.Database) {

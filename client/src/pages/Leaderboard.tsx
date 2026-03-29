@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { Founder } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
 
-type ViewMode = 'official' | 'community' | 'manual';
+type ViewMode = 'official' | 'community' | 'pairwise' | 'manual';
 
 export default function Leaderboard() {
   const [founders, setFounders] = useState<Founder[]>([]);
@@ -31,6 +31,11 @@ export default function Leaderboard() {
       const bScore = b.communityScore ?? b.sassyScore;
       return bScore - aScore;
     }
+    if (viewMode === 'pairwise') {
+      const aScore = a.eloScore ?? 1500;
+      const bScore = b.eloScore ?? 1500;
+      return bScore - aScore;
+    }
     return b.sassyScore - a.sassyScore;
   });
 
@@ -55,13 +60,18 @@ export default function Leaderboard() {
         <ModeButton active={viewMode === 'community'} onClick={() => setViewMode('community')}>
           🗳️ Community Ranking
         </ModeButton>
-        <ModeButton active={viewMode === 'manual'} onClick={() => setViewMode('manual')} highlight>
-          ✏️ Rate Them Yourself
+        <ModeButton active={viewMode === 'pairwise'} onClick={() => setViewMode('pairwise')} highlight>
+          🔥 Who's Sassier?
+        </ModeButton>
+        <ModeButton active={viewMode === 'manual'} onClick={() => setViewMode('manual')}>
+          ✏️ Rate Manually
         </ModeButton>
       </div>
 
       {viewMode === 'manual' ? (
         <ManualRankMode founders={founders} onVotesSubmitted={refreshFounders} />
+      ) : viewMode === 'pairwise' ? (
+        <PairwiseMode founders={founders} onVoted={refreshFounders} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {sorted.map((founder, index) => (
@@ -74,6 +84,229 @@ export default function Leaderboard() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function PairwiseMode({ founders, onVoted }: { founders: Founder[]; onVoted: () => void }) {
+  const [pair, setPair] = useState<[Founder, Founder] | null>(null);
+  const [votesThisSession, setVotesThisSession] = useState(0);
+  const [animating, setAnimating] = useState<number | null>(null); // id of chosen card
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  const getNextPair = () => {
+    fetch('/api/founders/pair')
+      .then(r => r.json())
+      .then(data => setPair(data.founders as [Founder, Founder]))
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    getNextPair();
+  }, []);
+
+  const handleVote = async (winnerId: number, loserId: number) => {
+    setAnimating(winnerId);
+    try {
+      await fetch('/api/pairwise/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ winnerId, loserId }),
+      });
+      setVotesThisSession(v => v + 1);
+      onVoted();
+    } catch {
+      // continue
+    }
+    setTimeout(() => {
+      setAnimating(null);
+      getNextPair();
+    }, 350);
+  };
+
+  if (showLeaderboard) {
+    const sorted = [...founders].sort((a, b) => (b.eloScore ?? 1500) - (a.eloScore ?? 1500));
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <button
+            onClick={() => setShowLeaderboard(false)}
+            style={{
+              padding: '8px 14px',
+              background: '#1a1208',
+              border: '1px solid #d97706',
+              borderRadius: '8px',
+              color: '#fbbf24',
+              fontSize: '13px',
+              fontWeight: 600,
+            }}
+          >
+            ← Keep Voting
+          </button>
+          <span style={{ color: '#9d8460', fontSize: '13px' }}>
+            Pairwise Leaderboard · {votesThisSession} votes this session
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {sorted.map((founder, index) => (
+            <div key={founder.id} style={{
+              background: '#1a1208',
+              border: '1px solid #3d2e10',
+              borderRadius: '10px',
+              padding: '12px 16px',
+              display: 'grid',
+              gridTemplateColumns: '44px 1fr auto',
+              alignItems: 'center',
+              gap: '12px',
+            }}>
+              <div style={{
+                width: '40px', height: '40px', borderRadius: '50%',
+                background: '#261a0c',
+                border: `2px solid ${index === 0 ? '#fbbf24' : index === 1 ? '#9ca3af' : index === 2 ? '#d97706' : '#4a3820'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 700, fontSize: '15px',
+                color: index === 0 ? '#fbbf24' : index === 1 ? '#9ca3af' : index === 2 ? '#d97706' : '#4a3820',
+                flexShrink: 0,
+              }}>
+                {index < 3 ? ['🥇', '🥈', '🥉'][index] : index + 1}
+              </div>
+              <div>
+                <span style={{ fontWeight: 600, fontSize: '14px', color: '#f5e6c8' }}>{founder.name}</span>
+                <span style={{ fontSize: '11px', color: '#9d8460', marginLeft: '8px' }}>{founder.company}</span>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: '#d97706' }}>
+                  {(founder.eloScore ?? 1500).toFixed(0)}
+                </div>
+                <div style={{ fontSize: '10px', color: '#5a4428' }}>Elo</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{
+        textAlign: 'center',
+        marginBottom: '20px',
+      }}>
+        <p style={{ color: '#9d8460', fontSize: '14px', marginBottom: '8px' }}>
+          Tap the sassier founder. Results update the Elo leaderboard.
+        </p>
+        {votesThisSession > 0 && (
+          <span style={{ fontSize: '12px', color: '#5a4428' }}>
+            {votesThisSession} vote{votesThisSession !== 1 ? 's' : ''} cast this session ·{' '}
+            <button
+              onClick={() => setShowLeaderboard(true)}
+              style={{ background: 'none', border: 'none', color: '#d97706', cursor: 'pointer', padding: 0, fontSize: '12px', textDecoration: 'underline' }}
+            >
+              See rankings
+            </button>
+          </span>
+        )}
+      </div>
+
+      {pair ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr auto 1fr',
+          gap: '12px',
+          alignItems: 'center',
+        }}>
+          {pair.map((founder, i) => {
+            const isChosen = animating === founder.id;
+            const isRejected = animating !== null && animating !== founder.id;
+            return (
+              <button
+                key={founder.id}
+                onClick={() => {
+                  if (animating === null) {
+                    const other = pair[i === 0 ? 1 : 0];
+                    handleVote(founder.id, other.id);
+                  }
+                }}
+                style={{
+                  background: isChosen ? '#3d1f00' : isRejected ? '#0e0a05' : '#1a1208',
+                  border: `2px solid ${isChosen ? '#d97706' : isRejected ? '#1a1208' : '#3d2e10'}`,
+                  borderRadius: '14px',
+                  padding: '24px 16px',
+                  cursor: animating === null ? 'pointer' : 'default',
+                  textAlign: 'center',
+                  transition: 'all 0.25s ease',
+                  opacity: isRejected ? 0.35 : 1,
+                  transform: isChosen ? 'scale(1.03)' : 'scale(1)',
+                  minHeight: '200px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '10px',
+                }}
+                onMouseEnter={e => {
+                  if (animating === null) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#d97706';
+                    (e.currentTarget as HTMLButtonElement).style.background = '#261a0c';
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (animating === null) {
+                    (e.currentTarget as HTMLButtonElement).style.borderColor = '#3d2e10';
+                    (e.currentTarget as HTMLButtonElement).style.background = '#1a1208';
+                  }
+                }}
+              >
+                <div style={{ fontSize: '36px' }}>
+                  {isChosen ? '🔥' : '🧑‍💼'}
+                </div>
+                <div style={{ fontWeight: 700, fontSize: '16px', color: '#f5e6c8' }}>{founder.name}</div>
+                <div style={{ fontSize: '12px', color: '#9d8460' }}>{founder.company}</div>
+                <div style={{ fontSize: '11px', color: '#5a4428', fontStyle: 'italic', lineHeight: 1.4, maxWidth: '180px' }}>
+                  "{founder.title}"
+                </div>
+                <div style={{
+                  marginTop: '8px',
+                  padding: '6px 14px',
+                  background: '#261a0c',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  color: '#d97706',
+                  fontWeight: 600,
+                }}>
+                  Sassier →
+                </div>
+              </button>
+            );
+          })}
+
+          <div style={{ textAlign: 'center', color: '#4a3820', fontSize: '18px', fontWeight: 700 }}>
+            VS
+          </div>
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '60px', color: '#9d8460' }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>🥃</div>
+          <p>Loading matchup...</p>
+        </div>
+      )}
+
+      <div style={{ marginTop: '20px', textAlign: 'center' }}>
+        <button
+          onClick={getNextPair}
+          style={{
+            padding: '8px 18px',
+            background: 'none',
+            border: '1px solid #3d2e10',
+            borderRadius: '8px',
+            color: '#5a4428',
+            fontSize: '13px',
+          }}
+        >
+          Skip this matchup →
+        </button>
+      </div>
     </div>
   );
 }
@@ -293,6 +526,7 @@ function FounderRow({ founder, rank, viewMode }: { founder: Founder; rank: numbe
   const score = viewMode === 'community' && founder.communityScore !== null
     ? founder.communityScore
     : founder.sassyScore;
+  const isPairwise = viewMode === 'pairwise';
 
   const rankColor = rank === 1 ? '#fbbf24' : rank === 2 ? '#9ca3af' : rank === 3 ? '#d97706' : '#4a3820';
 
@@ -354,10 +588,21 @@ function FounderRow({ founder, rank, viewMode }: { founder: Founder; rank: numbe
         </div>
 
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontSize: '22px', fontWeight: 700, color: score >= 8 ? '#ef4444' : score >= 5 ? '#f59e0b' : '#22c55e' }}>
-            {score.toFixed(1)}
-          </div>
-          <div style={{ fontSize: '10px', color: '#5a4428' }}>🥃 units</div>
+          {isPairwise ? (
+            <>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: '#d97706', lineHeight: 1 }}>
+                {(founder.eloScore ?? 1500).toFixed(0)}
+              </div>
+              <div style={{ fontSize: '10px', color: '#5a4428' }}>Elo</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: '22px', fontWeight: 700, color: score >= 8 ? '#ef4444' : score >= 5 ? '#f59e0b' : '#22c55e' }}>
+                {score.toFixed(1)}
+              </div>
+              <div style={{ fontSize: '10px', color: '#5a4428' }}>🥃 units</div>
+            </>
+          )}
         </div>
       </div>
     </Link>

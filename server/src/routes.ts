@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getDb } from './db';
+import { getDb, computeEloRatings } from './db';
 
 const router = Router();
 
@@ -33,7 +33,47 @@ function toFounder(row: Record<string, unknown>) {
 router.get('/founders', (_req: Request, res: Response) => {
   const db = getDb();
   const rows = db.prepare('SELECT * FROM founders ORDER BY sassy_score DESC').all() as Record<string, unknown>[];
-  res.json({ founders: rows.map(toFounder), total: rows.length });
+  const eloRatings = computeEloRatings(db);
+  const founders = rows.map(row => ({
+    ...toFounder(row),
+    eloScore: Math.round((eloRatings.get(row.id as number) ?? 1500) * 10) / 10,
+  }));
+  res.json({ founders, total: rows.length });
+});
+
+// GET /api/founders/pair — return two random founders for pairwise comparison
+router.get('/founders/pair', (_req: Request, res: Response) => {
+  const db = getDb();
+  const rows = db.prepare('SELECT * FROM founders').all() as Record<string, unknown>[];
+  if (rows.length < 2) {
+    res.status(400).json({ error: 'Not enough founders' });
+    return;
+  }
+  const shuffled = [...rows].sort(() => Math.random() - 0.5);
+  const [a, b] = shuffled;
+  res.json({ founders: [toFounder(a), toFounder(b)] });
+});
+
+// POST /api/pairwise/vote — record a pairwise vote
+router.post('/pairwise/vote', (req: Request, res: Response) => {
+  const db = getDb();
+  const { winnerId, loserId } = req.body;
+  if (!winnerId || !loserId || winnerId === loserId) {
+    res.status(400).json({ error: 'winnerId and loserId must be different valid founder ids' });
+    return;
+  }
+  const winner = db.prepare('SELECT id FROM founders WHERE id = ?').get(winnerId);
+  const loser = db.prepare('SELECT id FROM founders WHERE id = ?').get(loserId);
+  if (!winner || !loser) {
+    res.status(404).json({ error: 'Founder not found' });
+    return;
+  }
+  db.prepare('INSERT INTO pairwise_votes (winner_id, loser_id) VALUES (?, ?)').run(winnerId, loserId);
+  const eloRatings = computeEloRatings(db);
+  res.json({
+    winnerElo: Math.round((eloRatings.get(Number(winnerId)) ?? 1500) * 10) / 10,
+    loserElo: Math.round((eloRatings.get(Number(loserId)) ?? 1500) * 10) / 10,
+  });
 });
 
 // GET /api/founders/:id — founder detail

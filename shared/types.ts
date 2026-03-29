@@ -8,6 +8,7 @@ export interface Founder {
   sassyScore: number; // 0-10 whiskey units (algorithmic)
   communityScore: number | null; // average of user submissions
   communityVoteCount: number;
+  eloScore?: number; // Elo rating from pairwise votes (baseline 1500)
   scoreBreakdown: ScoreBreakdown;
 }
 
