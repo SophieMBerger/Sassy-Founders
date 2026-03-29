@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom';
 import type { Founder } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
 
-type SortMode = 'official' | 'community';
+type ViewMode = 'official' | 'community' | 'manual';
 
 export default function Leaderboard() {
   const [founders, setFounders] = useState<Founder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sortMode, setSortMode] = useState<SortMode>('official');
+  const [viewMode, setViewMode] = useState<ViewMode>('official');
 
   useEffect(() => {
     fetch('/api/founders')
@@ -18,8 +18,15 @@ export default function Leaderboard() {
       .catch(() => { setError('Failed to load founders'); setLoading(false); });
   }, []);
 
+  const refreshFounders = () => {
+    fetch('/api/founders')
+      .then(r => r.json())
+      .then(data => setFounders(data.founders))
+      .catch(() => {});
+  };
+
   const sorted = [...founders].sort((a, b) => {
-    if (sortMode === 'community') {
+    if (viewMode === 'community') {
       const aScore = a.communityScore ?? a.sassyScore;
       const bScore = b.communityScore ?? b.sassyScore;
       return bScore - aScore;
@@ -32,7 +39,7 @@ export default function Leaderboard() {
 
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: '20px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#fbbf24', marginBottom: '4px' }}>
           🏆 Sassy Leaderboard
         </h2>
@@ -41,22 +48,141 @@ export default function Leaderboard() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        <ModeButton active={sortMode === 'official'} onClick={() => setSortMode('official')}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <ModeButton active={viewMode === 'official'} onClick={() => setViewMode('official')}>
           📊 Official Ranking
         </ModeButton>
-        <ModeButton active={sortMode === 'community'} onClick={() => setSortMode('community')}>
+        <ModeButton active={viewMode === 'community'} onClick={() => setViewMode('community')}>
           🗳️ Community Ranking
+        </ModeButton>
+        <ModeButton active={viewMode === 'manual'} onClick={() => setViewMode('manual')} highlight>
+          ✏️ Rate Them Yourself
         </ModeButton>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {sorted.map((founder, index) => (
-          <FounderRow
+      {viewMode === 'manual' ? (
+        <ManualRankMode founders={founders} onVotesSubmitted={refreshFounders} />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {sorted.map((founder, index) => (
+            <FounderRow
+              key={founder.id}
+              founder={founder}
+              rank={index + 1}
+              viewMode={viewMode}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ManualRankMode({ founders, onVotesSubmitted }: { founders: Founder[]; onVotesSubmitted: () => void }) {
+  const [votes, setVotes] = useState<Record<number, number>>(() =>
+    Object.fromEntries(founders.map(f => [f.id, 5]))
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitCount, setSubmitCount] = useState(0);
+
+  const ratedCount = Object.values(votes).filter(v => v !== 5).length;
+
+  async function handleSubmitAll() {
+    setSubmitting(true);
+    const entries = Object.entries(votes);
+    let count = 0;
+    for (const [founderId, units] of entries) {
+      try {
+        await fetch(`/api/founders/${founderId}/vote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ whiskeyUnits: units }),
+        });
+        count++;
+      } catch {
+        // continue
+      }
+    }
+    setSubmitCount(count);
+    setSubmitting(false);
+    setSubmitted(true);
+    onVotesSubmitted();
+    setTimeout(() => setSubmitted(false), 4000);
+  }
+
+  // Sort by current user votes desc for a "preview ranking"
+  const ranked = [...founders].sort((a, b) => (votes[b.id] ?? 5) - (votes[a.id] ?? 5));
+
+  return (
+    <div>
+      <div style={{
+        background: '#1a1208',
+        border: '1px solid #d97706',
+        borderRadius: '12px',
+        padding: '16px 20px',
+        marginBottom: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        flexWrap: 'wrap',
+      }}>
+        <div>
+          <div style={{ fontWeight: 600, color: '#fbbf24', marginBottom: '2px' }}>
+            🥃 Your Personal Ranking
+          </div>
+          <div style={{ fontSize: '13px', color: '#9d8460' }}>
+            Drag the sliders — your list re-ranks live. Submit to add to community averages.
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {ratedCount > 0 && (
+            <span style={{ fontSize: '12px', color: '#d97706' }}>
+              {ratedCount} modified
+            </span>
+          )}
+          <button
+            onClick={handleSubmitAll}
+            disabled={submitting}
+            style={{
+              padding: '9px 20px',
+              background: submitting ? '#3d2e10' : '#d97706',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: 600,
+              fontSize: '14px',
+              opacity: submitting ? 0.6 : 1,
+              transition: 'all 0.15s',
+            }}
+          >
+            {submitting ? 'Submitting...' : `Submit All ${founders.length} Ratings`}
+          </button>
+        </div>
+      </div>
+
+      {submitted && (
+        <div style={{
+          padding: '12px 16px',
+          background: '#14532d',
+          borderRadius: '10px',
+          marginBottom: '16px',
+          fontSize: '14px',
+          color: '#4ade80',
+        }}>
+          ✓ {submitCount} ratings submitted! Community averages updated.
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {ranked.map((founder, index) => (
+          <ManualRankRow
             key={founder.id}
             founder={founder}
             rank={index + 1}
-            sortMode={sortMode}
+            value={votes[founder.id] ?? 5}
+            onChange={v => setVotes(prev => ({ ...prev, [founder.id]: v }))}
           />
         ))}
       </div>
@@ -64,8 +190,91 @@ export default function Leaderboard() {
   );
 }
 
-function FounderRow({ founder, rank, sortMode }: { founder: Founder; rank: number; sortMode: SortMode }) {
-  const score = sortMode === 'community' && founder.communityScore !== null
+function ManualRankRow({
+  founder,
+  rank,
+  value,
+  onChange,
+}: {
+  founder: Founder;
+  rank: number;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const rankColor = rank === 1 ? '#fbbf24' : rank === 2 ? '#9ca3af' : rank === 3 ? '#d97706' : '#4a3820';
+  const scoreColor = value >= 8 ? '#ef4444' : value >= 5 ? '#f59e0b' : '#22c55e';
+
+  return (
+    <div style={{
+      background: '#1a1208',
+      border: '1px solid #3d2e10',
+      borderRadius: '10px',
+      padding: '12px 16px',
+      display: 'grid',
+      gridTemplateColumns: '44px 1fr auto',
+      alignItems: 'center',
+      gap: '14px',
+    }}>
+      <div style={{
+        width: '40px',
+        height: '40px',
+        borderRadius: '50%',
+        background: '#261a0c',
+        border: `2px solid ${rankColor}`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 700,
+        fontSize: '15px',
+        color: rankColor,
+        flexShrink: 0,
+      }}>
+        {rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : rank}
+      </div>
+
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          <span style={{ fontWeight: 600, fontSize: '14px', color: '#f5e6c8' }}>{founder.name}</span>
+          <span style={{ fontSize: '11px', color: '#9d8460' }}>{founder.company}</span>
+          {founder.communityScore !== null && (
+            <span style={{ fontSize: '11px', color: '#5a4428' }}>
+              community avg: {founder.communityScore.toFixed(1)} ({founder.communityVoteCount} votes)
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <input
+            type="range"
+            min={0}
+            max={10}
+            step={0.5}
+            value={value}
+            onChange={e => onChange(Number(e.target.value))}
+            style={{ flex: 1, accentColor: scoreColor, height: '4px' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#5a4428', width: '100%', position: 'absolute', pointerEvents: 'none', visibility: 'hidden' }}>
+            <span>0</span><span>10</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#4a3820', marginTop: '2px' }}>
+          <span>0 = delightful</span>
+          <span>5 = tolerable</span>
+          <span>10 = send help</span>
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'right', flexShrink: 0, minWidth: '52px' }}>
+        <div style={{ fontSize: '22px', fontWeight: 700, color: scoreColor, lineHeight: 1 }}>
+          {value.toFixed(1)}
+        </div>
+        <div style={{ fontSize: '10px', color: '#5a4428' }}>🥃</div>
+      </div>
+    </div>
+  );
+}
+
+function FounderRow({ founder, rank, viewMode }: { founder: Founder; rank: number; viewMode: ViewMode }) {
+  const score = viewMode === 'community' && founder.communityScore !== null
     ? founder.communityScore
     : founder.sassyScore;
 
@@ -139,16 +348,26 @@ function FounderRow({ founder, rank, sortMode }: { founder: Founder; rank: numbe
   );
 }
 
-function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function ModeButton({
+  active,
+  onClick,
+  children,
+  highlight,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  highlight?: boolean;
+}) {
   return (
     <button
       onClick={onClick}
       style={{
         padding: '8px 14px',
         borderRadius: '8px',
-        border: `1px solid ${active ? '#d97706' : '#3d2e10'}`,
-        background: active ? '#3d2004' : '#1a1208',
-        color: active ? '#fbbf24' : '#9d8460',
+        border: `1px solid ${active ? '#d97706' : highlight ? '#7c3a00' : '#3d2e10'}`,
+        background: active ? '#3d2004' : highlight ? '#1f0f00' : '#1a1208',
+        color: active ? '#fbbf24' : highlight ? '#c47a1e' : '#9d8460',
         fontSize: '13px',
         fontWeight: active ? 600 : 400,
         transition: 'all 0.15s',
