@@ -32,4 +32,13 @@ export interface RankingResponse {
 
 export interface FounderDetailResponse extends Founder {
   communityVotes: UserVote[];
+  myVote: number | null;
+}
+
+export interface AuthUser {
+  id: number;
+  name: string | null;
+  email: string | null;
+  avatarUrl: string | null;
+  provider: string;
 }

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getPool, computeEloRatings } from './db';
+import { getAuthUser } from './auth';
 
 const router = Router();
 
@@ -107,9 +108,21 @@ router.get('/founders/:id', async (req: Request, res: Response) => {
       [req.params.id]
     );
 
+    // Include the current user's vote if authenticated
+    const user = getAuthUser(req);
+    let myVote: number | null = null;
+    if (user) {
+      const { rows: myVoteRows } = await db.query<{ whiskey_units: number }>(
+        'SELECT whiskey_units FROM community_votes WHERE founder_id = $1 AND user_id = $2',
+        [req.params.id, user.id]
+      );
+      myVote = myVoteRows[0]?.whiskey_units ?? null;
+    }
+
     res.json({
       ...(await toFounder(rows[0])),
       communityVotes: votes.map(v => ({ founderId: Number(req.params.id), whiskeyUnits: v.whiskey_units })),
+      myVote,
     });
   } catch (err) {
     console.error(err);
@@ -117,8 +130,14 @@ router.get('/founders/:id', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/founders/:id/vote — submit community vote
+// POST /api/founders/:id/vote — submit community vote (requires auth, one vote per user per founder)
 router.post('/founders/:id/vote', async (req: Request, res: Response) => {
+  const user = getAuthUser(req);
+  if (!user) {
+    res.status(401).json({ error: 'Sign in to vote' });
+    return;
+  }
+
   try {
     const db = getPool();
     const { rows } = await db.query('SELECT id FROM founders WHERE id = $1', [req.params.id]);
@@ -133,7 +152,14 @@ router.post('/founders/:id/vote', async (req: Request, res: Response) => {
       return;
     }
 
-    await db.query('INSERT INTO community_votes (founder_id, whiskey_units) VALUES ($1, $2)', [req.params.id, units]);
+    // Upsert: one vote per user per founder
+    await db.query(
+      `INSERT INTO community_votes (founder_id, user_id, whiskey_units)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (user_id, founder_id) WHERE user_id IS NOT NULL
+       DO UPDATE SET whiskey_units = EXCLUDED.whiskey_units, created_at = NOW()`,
+      [req.params.id, user.id, units]
+    );
 
     const { rows: updatedRows } = await db.query('SELECT * FROM founders WHERE id = $1', [req.params.id]);
     res.json(await toFounder(updatedRows[0]));

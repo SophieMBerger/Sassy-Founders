@@ -3,14 +3,15 @@ import { Link } from 'react-router-dom';
 import type { Founder } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
 import { cn } from '@/lib/utils';
-import { BarChart3, Users, Flame, ChevronRight } from 'lucide-react';
+import { BarChart3, Users, Flame, ChevronRight, LayoutGrid } from 'lucide-react';
 
-type ViewMode = 'official' | 'community' | 'pairwise';
+type ViewMode = 'official' | 'community' | 'pairwise' | 'compare';
 
 const MODES: { id: ViewMode; label: string; icon: React.ReactNode; hot?: boolean }[] = [
   { id: 'official', label: 'Official', icon: <BarChart3 className="w-3.5 h-3.5" /> },
   { id: 'community', label: 'Community', icon: <Users className="w-3.5 h-3.5" /> },
   { id: 'pairwise', label: "Who's Sassier?", icon: <Flame className="w-3.5 h-3.5" />, hot: true },
+  { id: 'compare', label: 'Compare All', icon: <LayoutGrid className="w-3.5 h-3.5" /> },
 ];
 
 export default function Leaderboard() {

@@ -30,12 +30,27 @@ export async function initSchema(): Promise<void> {
       buzzword_density FLOAT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      provider TEXT NOT NULL,
+      provider_id TEXT NOT NULL,
+      email TEXT,
+      name TEXT,
+      avatar_url TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(provider, provider_id)
+    );
+
     CREATE TABLE IF NOT EXISTS community_votes (
       id SERIAL PRIMARY KEY,
       founder_id INTEGER NOT NULL REFERENCES founders(id),
+      user_id INTEGER REFERENCES users(id),
       whiskey_units FLOAT NOT NULL CHECK(whiskey_units >= 0 AND whiskey_units <= 10),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_community_votes_user_founder
+      ON community_votes(user_id, founder_id) WHERE user_id IS NOT NULL;
 
     CREATE TABLE IF NOT EXISTS pairwise_votes (
       id SERIAL PRIMARY KEY,

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { FounderDetailResponse } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
+import LoginModal from '../components/LoginModal';
+import { useAuth } from '../context/AuthContext';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, BarChart3, Loader2, Users } from 'lucide-react';
 
@@ -15,31 +17,40 @@ const BREAKDOWN_LABELS: Record<string, string> = {
 
 export default function FounderDetail() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [founder, setFounder] = useState<FounderDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [vote, setVote] = useState<number>(5);
   const [voting, setVoting] = useState(false);
   const [voteSuccess, setVoteSuccess] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/founders/${id}`)
+    fetch(`/api/founders/${id}`, { credentials: 'include' })
       .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
-      .then(data => { setFounder(data); setLoading(false); })
+      .then((data: FounderDetailResponse) => {
+        setFounder(data);
+        if (data.myVote !== null) setVote(data.myVote);
+        setLoading(false);
+      })
       .catch(() => { setError('Founder not found'); setLoading(false); });
-  }, [id]);
+  }, [id, user]);
 
   async function handleVote() {
+    if (!user) { setShowLogin(true); return; }
     if (!founder) return;
     setVoting(true);
     try {
       const res = await fetch(`/api/founders/${id}/vote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ whiskeyUnits: vote }),
       });
+      if (res.status === 401) { setShowLogin(true); return; }
       const updated = await res.json();
-      setFounder(prev => prev ? { ...prev, ...updated } : prev);
+      setFounder(prev => prev ? { ...prev, ...updated, myVote: vote } : prev);
       setVoteSuccess(true);
       setTimeout(() => setVoteSuccess(false), 3000);
     } catch { /* ignore */ } finally { setVoting(false); }
@@ -136,48 +147,71 @@ export default function FounderDetail() {
           <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
             <Users className="w-3.5 h-3.5 text-amber-500" />
           </div>
-          <h3 className="font-bold text-sm text-zinc-200">Submit Your Rating</h3>
+          <h3 className="font-bold text-sm text-zinc-200">
+            {founder.myVote !== null ? 'Update Your Rating' : 'Submit Your Rating'}
+          </h3>
         </div>
-        <p className="text-sm text-zinc-500 mb-5">
-          How many 🥃 units to enjoy a conversation with {founder.name.split(' ')[0]}?
-        </p>
 
-        <div className="flex items-center gap-5 flex-wrap">
-          <div className="flex-1 min-w-[180px]">
-            <input
-              type="range" min={0} max={10} step={0.5} value={vote}
-              onChange={e => setVote(Number(e.target.value))}
-              className="w-full"
-            />
-            <div className="flex justify-between text-[11px] text-zinc-700 mt-1">
-              <span>0 (delightful)</span>
-              <span>5 (tolerable)</span>
-              <span>10 (send help)</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-white/5 flex items-center justify-center">
-              <span className={cn('text-xl font-black tabular-nums', vote >= 8 ? 'text-red-400' : vote >= 5 ? 'text-amber-400' : 'text-emerald-400')}>
-                {vote}
-              </span>
-            </div>
+        {!user ? (
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-sm text-zinc-500">
+              Sign in to rate {founder.name.split(' ')[0]} — your vote is tracked across sessions.
+            </p>
             <button
-              onClick={handleVote}
-              disabled={voting}
-              className={cn(
-                'px-6 py-2.5 rounded-2xl text-sm font-bold text-white border-none transition-all',
-                voting ? 'bg-zinc-700 opacity-60 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-900/30'
-              )}
+              onClick={() => setShowLogin(true)}
+              className="px-5 py-2.5 rounded-2xl text-sm font-bold text-white bg-amber-600 hover:bg-amber-500 transition-colors border-none cursor-pointer shadow-lg shadow-amber-900/30"
             >
-              {voting ? <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" />...</span> : 'Submit'}
+              Sign in to vote
             </button>
           </div>
-        </div>
+        ) : (
+          <>
+            <p className="text-sm text-zinc-500 mb-5">
+              How many 🥃 units to enjoy a conversation with {founder.name.split(' ')[0]}?
+              {founder.myVote !== null && (
+                <span className="text-amber-600/80 ml-2">Your current vote: {founder.myVote}</span>
+              )}
+            </p>
 
-        {voteSuccess && (
-          <div className="mt-4 px-4 py-3 rounded-xl bg-emerald-950/40 border border-emerald-800/30 text-sm text-emerald-400 font-medium">
-            ✓ Vote submitted! Thanks for rating.
-          </div>
+            <div className="flex items-center gap-5 flex-wrap">
+              <div className="flex-1 min-w-[180px]">
+                <input
+                  type="range" min={0} max={10} step={0.5} value={vote}
+                  onChange={e => setVote(Number(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-[11px] text-zinc-700 mt-1">
+                  <span>0 (delightful)</span>
+                  <span>5 (tolerable)</span>
+                  <span>10 (send help)</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-white/5 flex items-center justify-center">
+                  <span className={cn('text-xl font-black tabular-nums', vote >= 8 ? 'text-red-400' : vote >= 5 ? 'text-amber-400' : 'text-emerald-400')}>
+                    {vote}
+                  </span>
+                </div>
+                <button
+                  onClick={handleVote}
+                  disabled={voting}
+                  className={cn(
+                    'px-6 py-2.5 rounded-2xl text-sm font-bold text-white border-none transition-all',
+                    voting ? 'bg-zinc-700 opacity-60 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-900/30'
+                  )}
+                >
+                  {voting ? <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" />...</span>
+                    : founder.myVote !== null ? 'Update Vote' : 'Submit'}
+                </button>
+              </div>
+            </div>
+
+            {voteSuccess && (
+              <div className="mt-4 px-4 py-3 rounded-xl bg-emerald-950/40 border border-emerald-800/30 text-sm text-emerald-400 font-medium">
+                ✓ Vote {founder.myVote !== null ? 'updated' : 'submitted'}! Thanks for rating.
+              </div>
+            )}
+          </>
         )}
 
         {founder.communityVoteCount > 0 && (
@@ -197,6 +231,8 @@ export default function FounderDetail() {
           </div>
         )}
       </div>
+
+      {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
     </div>
   );
 }
