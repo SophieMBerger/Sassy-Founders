@@ -106,6 +106,8 @@ export default function Leaderboard() {
       {/* Content */}
       {viewMode === 'pairwise' ? (
         <PairwiseMode founders={founders} onVoted={refreshFounders} />
+      ) : viewMode === 'compare' ? (
+        <CompareMode founders={founders} onVoted={refreshFounders} />
       ) : (
         <div className="space-y-2">
           {sorted.map((founder, index) => (
@@ -357,6 +359,226 @@ function PairwiseMode({ founders, onVoted }: { founders: Founder[]; onVoted: () 
           Skip →
         </button>
       </div>
+    </div>
+  );
+}
+
+type SortKey = 'official' | 'community' | 'elo';
+
+function CompareMode({ founders, onVoted }: { founders: Founder[]; onVoted: () => void }) {
+  const [sortKey, setSortKey] = useState<SortKey>('official');
+  const [showVoting, setShowVoting] = useState(false);
+  const [votesThisSession, setVotesThisSession] = useState(0);
+
+  const officialRanked = [...founders].sort((a, b) => b.sassyScore - a.sassyScore);
+  const communityRanked = [...founders].sort((a, b) => (b.communityScore ?? b.sassyScore) - (a.communityScore ?? a.sassyScore));
+  const eloRanked = [...founders].sort((a, b) => (b.eloScore ?? 1500) - (a.eloScore ?? 1500));
+
+  const officialRankMap = new Map(officialRanked.map((f, i) => [f.id, i + 1]));
+  const communityRankMap = new Map(communityRanked.map((f, i) => [f.id, i + 1]));
+  const eloRankMap = new Map(eloRanked.map((f, i) => [f.id, i + 1]));
+
+  const sorted = sortKey === 'community' ? communityRanked : sortKey === 'elo' ? eloRanked : officialRanked;
+
+  const colBtn = (key: SortKey, label: string) => (
+    <button
+      onClick={() => setSortKey(key)}
+      className={cn(
+        'text-xs font-semibold px-3 py-1.5 rounded-full border transition-all',
+        sortKey === key
+          ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+          : 'text-zinc-600 border-white/[0.06] hover:text-zinc-400 bg-transparent'
+      )}
+    >
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-600 font-medium">Sort by:</span>
+          {colBtn('official', '🏆 Official')}
+          {colBtn('community', '👥 Community')}
+          {colBtn('elo', "🔥 Who's Sassier")}
+        </div>
+        <button
+          onClick={() => setShowVoting(v => !v)}
+          className={cn(
+            'inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold border transition-all',
+            showVoting
+              ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+              : 'text-zinc-500 border-white/[0.06] hover:text-zinc-300 bg-transparent'
+          )}
+        >
+          <Flame className="w-3 h-3" />
+          {showVoting ? 'Hide Voting' : 'Vote Now'}
+        </button>
+      </div>
+
+      <div className={cn('grid gap-4', showVoting ? 'lg:grid-cols-[1fr_380px]' : 'grid-cols-1')}>
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-[auto_1fr_80px_80px_80px] gap-3 px-5 pb-1 text-[10px] font-semibold text-zinc-700 uppercase tracking-wider">
+            <div className="w-9" />
+            <div>Founder</div>
+            <div className="text-center">Official</div>
+            <div className="text-center">Community</div>
+            <div className="text-center">Sassier</div>
+          </div>
+
+          {sorted.map((founder, index) => {
+            const officialRank = officialRankMap.get(founder.id)!;
+            const communityRank = communityRankMap.get(founder.id)!;
+            const eloRank = eloRankMap.get(founder.id)!;
+            const currentRank = index + 1;
+
+            return (
+              <Link to={`/founders/${founder.id}`} key={founder.id} className="no-underline block group">
+                <div className={cn(
+                  'relative grid grid-cols-[auto_1fr_80px_80px_80px] gap-3 items-center px-5 py-3.5 rounded-2xl border transition-all duration-200',
+                  currentRank <= 3
+                    ? 'bg-gradient-to-r from-amber-950/30 to-transparent border-amber-900/30 hover:border-amber-700/40'
+                    : 'bg-zinc-900/40 border-white/[0.05] hover:bg-zinc-800/50 hover:border-white/10'
+                )}>
+                  <RankBadge rank={currentRank} />
+                  <div className="flex items-center gap-3 min-w-0">
+                    {founder.imageUrl ? (
+                      <img src={founder.imageUrl} alt={founder.name} className="w-8 h-8 rounded-lg object-cover border border-white/10 flex-shrink-0" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-white/5 flex items-center justify-center text-sm flex-shrink-0">
+                        {founder.name.charAt(0)}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm text-white truncate">{founder.name}</div>
+                      <div className="text-[11px] text-zinc-600 truncate">{founder.company}</div>
+                    </div>
+                  </div>
+                  <ScoreCell value={founder.sassyScore.toFixed(1)} unit="🥃" rank={officialRank} active={sortKey === 'official'} />
+                  <ScoreCell value={(founder.communityScore ?? founder.sassyScore).toFixed(1)} unit="🥃" rank={communityRank} active={sortKey === 'community'} dim={!founder.communityScore} />
+                  <ScoreCell value={(founder.eloScore ?? 1500).toFixed(0)} unit="elo" rank={eloRank} active={sortKey === 'elo'} />
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+
+        {showVoting && (
+          <div className="lg:sticky lg:top-24 self-start">
+            <div className="rounded-3xl border border-white/[0.06] bg-zinc-900/50 p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Flame className="w-4 h-4 text-amber-500" />
+                <span className="text-sm font-semibold text-white">Who's Sassier?</span>
+              </div>
+              <p className="text-xs text-zinc-600">Tap the sassier founder to update Elo rankings.</p>
+              <InlineVoting onVoted={() => { onVoted(); setVotesThisSession(v => v + 1); }} />
+              {votesThisSession > 0 && (
+                <p className="text-[11px] text-zinc-700 text-center">{votesThisSession} vote{votesThisSession !== 1 ? 's' : ''} this session</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScoreCell({ value, unit, rank, active, dim }: { value: string; unit: string; rank: number; active: boolean; dim?: boolean }) {
+  return (
+    <div className={cn('flex flex-col items-center gap-0.5', dim && 'opacity-40')}>
+      <div className={cn('text-sm font-black tabular-nums leading-none', active ? 'text-amber-300' : 'text-zinc-400')}>
+        {value}
+        <span className="text-[9px] font-medium ml-0.5 opacity-60">{unit}</span>
+      </div>
+      <span className="text-[10px] text-zinc-700">#{rank}</span>
+    </div>
+  );
+}
+
+function InlineVoting({ onVoted }: { onVoted: () => void }) {
+  const [pair, setPair] = useState<[Founder, Founder] | null>(null);
+  const [animating, setAnimating] = useState<number | null>(null);
+
+  const getNextPair = () => {
+    fetch('/api/founders/pair')
+      .then(r => r.json())
+      .then(data => setPair(data.founders as [Founder, Founder]))
+      .catch(() => {});
+  };
+
+  useEffect(() => { getNextPair(); }, []);
+
+  const handleVote = async (winnerId: number, loserId: number) => {
+    setAnimating(winnerId);
+    try {
+      await fetch('/api/pairwise/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ winnerId, loserId }),
+      });
+      onVoted();
+    } catch { /* continue */ }
+    setTimeout(() => { setAnimating(null); getNextPair(); }, 400);
+  };
+
+  if (!pair) return (
+    <div className="text-center py-8 text-zinc-700">
+      <div className="text-3xl mb-2">🥃</div>
+      <p className="text-xs">Loading matchup...</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-stretch">
+        {([pair[0], null, pair[1]] as (Founder | null)[]).map((founder, i) => {
+          if (!founder) return (
+            <div key="vs" className="flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full glass flex items-center justify-center text-[10px] font-black text-zinc-700">VS</div>
+            </div>
+          );
+          const isChosen = animating === founder.id;
+          const isRejected = animating !== null && animating !== founder.id;
+          const founderIndex = i === 0 ? 0 : 1;
+          return (
+            <button
+              key={founder.id}
+              onClick={() => { if (animating === null) handleVote(founder.id, pair[founderIndex === 0 ? 1 : 0].id); }}
+              className={cn(
+                'flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 w-full text-center',
+                isChosen ? 'bg-amber-950/40 border-amber-500/60 scale-[1.02]' :
+                isRejected ? 'opacity-30 scale-95 border-zinc-900 bg-zinc-950/50' :
+                'bg-zinc-800/50 border-white/[0.06] hover:bg-zinc-800/80 hover:border-amber-900/40'
+              )}
+            >
+              {founder.imageUrl ? (
+                <img src={founder.imageUrl} alt={founder.name} className="w-14 h-14 rounded-xl object-cover border border-white/10" />
+              ) : (
+                <div className="w-14 h-14 rounded-xl bg-zinc-700/60 border border-white/5 flex items-center justify-center text-2xl">
+                  {isChosen ? '🔥' : founder.name.charAt(0)}
+                </div>
+              )}
+              <div>
+                <div className="font-bold text-xs text-white leading-tight">{founder.name}</div>
+                <div className="text-[10px] text-zinc-600 mt-0.5">{founder.company}</div>
+              </div>
+              <div className={cn(
+                'px-3 py-1 rounded-full text-[10px] font-bold border',
+                isChosen ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'text-zinc-600 border-white/[0.06] bg-transparent'
+              )}>
+                {isChosen ? '🔥 Sassier!' : 'Sassier →'}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <button
+        onClick={getNextPair}
+        className="w-full py-1.5 rounded-full text-xs text-zinc-700 border border-white/[0.06] hover:bg-white/[0.04] hover:text-zinc-500 transition-all bg-transparent"
+      >
+        Skip →
+      </button>
     </div>
   );
 }
