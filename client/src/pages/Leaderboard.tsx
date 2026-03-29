@@ -1,17 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Founder } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
 import { cn } from '@/lib/utils';
-import { BarChart3, Users, Flame, SlidersHorizontal, ChevronRight, Loader2 } from 'lucide-react';
+import { BarChart3, Users, Flame, ChevronRight } from 'lucide-react';
 
-type ViewMode = 'official' | 'community' | 'pairwise' | 'manual';
+type ViewMode = 'official' | 'community' | 'pairwise';
 
 const MODES: { id: ViewMode; label: string; icon: React.ReactNode; hot?: boolean }[] = [
   { id: 'official', label: 'Official', icon: <BarChart3 className="w-3.5 h-3.5" /> },
   { id: 'community', label: 'Community', icon: <Users className="w-3.5 h-3.5" /> },
   { id: 'pairwise', label: "Who's Sassier?", icon: <Flame className="w-3.5 h-3.5" />, hot: true },
-  { id: 'manual', label: 'Rate Manually', icon: <SlidersHorizontal className="w-3.5 h-3.5" /> },
 ];
 
 export default function Leaderboard() {
@@ -104,9 +103,7 @@ export default function Leaderboard() {
       </div>
 
       {/* Content */}
-      {viewMode === 'manual' ? (
-        <ManualRankMode founders={founders} onVotesSubmitted={refreshFounders} />
-      ) : viewMode === 'pairwise' ? (
+      {viewMode === 'pairwise' ? (
         <PairwiseMode founders={founders} onVoted={refreshFounders} />
       ) : (
         <div className="space-y-2">
@@ -358,131 +355,6 @@ function PairwiseMode({ founders, onVoted }: { founders: Founder[]; onVoted: () 
         >
           Skip →
         </button>
-      </div>
-    </div>
-  );
-}
-
-function ManualRankMode({ founders, onVotesSubmitted }: { founders: Founder[]; onVotesSubmitted: () => void }) {
-  const [votes, setVotes] = useState<Record<number, number>>(() =>
-    Object.fromEntries(founders.map(f => [f.id, 5]))
-  );
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [submitCount, setSubmitCount] = useState(0);
-
-  const ratedCount = Object.values(votes).filter(v => v !== 5).length;
-
-  async function handleSubmitAll() {
-    setSubmitting(true);
-    let count = 0;
-    for (const [founderId, units] of Object.entries(votes)) {
-      try {
-        await fetch(`/api/founders/${founderId}/vote`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ whiskeyUnits: units }),
-        });
-        count++;
-      } catch { /* continue */ }
-    }
-    setSubmitCount(count);
-    setSubmitting(false);
-    setSubmitted(true);
-    onVotesSubmitted();
-    setTimeout(() => setSubmitted(false), 4000);
-  }
-
-  const ranked = [...founders].sort((a, b) => (votes[b.id] ?? 5) - (votes[a.id] ?? 5));
-
-  return (
-    <div className="space-y-4">
-      {/* Header card */}
-      <div className="flex items-center justify-between px-5 py-4 rounded-2xl glass-amber">
-        <div>
-          <div className="font-bold text-amber-300 text-sm">🥃 Your Personal Ranking</div>
-          <div className="text-xs text-zinc-500 mt-0.5">
-            Drag sliders — your list re-ranks live. Submit to contribute to community averages.
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {ratedCount > 0 && (
-            <span className="text-xs text-amber-600 font-medium">{ratedCount} modified</span>
-          )}
-          <button
-            onClick={handleSubmitAll}
-            disabled={submitting}
-            className={cn(
-              'px-5 py-2 rounded-full text-sm font-bold text-white transition-all border-none',
-              submitting ? 'bg-zinc-700 opacity-60 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-900/30'
-            )}
-          >
-            {submitting ? (
-              <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" />Submitting...</span>
-            ) : `Submit ${founders.length} Ratings`}
-          </button>
-        </div>
-      </div>
-
-      {submitted && (
-        <div className="px-4 py-3 rounded-2xl bg-emerald-950/40 border border-emerald-800/30 text-sm text-emerald-400 font-medium">
-          ✓ {submitCount} ratings submitted! Community averages updated.
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {ranked.map((founder, index) => (
-          <ManualRankRow
-            key={founder.id}
-            founder={founder}
-            rank={index + 1}
-            value={votes[founder.id] ?? 5}
-            onChange={v => setVotes(prev => ({ ...prev, [founder.id]: v }))}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ManualRankRow({
-  founder, rank, value, onChange,
-}: { founder: Founder; rank: number; value: number; onChange: (v: number) => void }) {
-  const [localValue, setLocalValue] = useState(value);
-  const dragging = useRef(false);
-
-  useEffect(() => {
-    if (!dragging.current) setLocalValue(value);
-  }, [value]);
-
-  const scoreTextClass = localValue >= 8 ? 'text-red-400' : localValue >= 5 ? 'text-amber-400' : 'text-emerald-400';
-
-  return (
-    <div className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-zinc-900/40 border border-white/[0.05]">
-      <RankBadge rank={rank} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 mb-2 flex-wrap">
-          <span className="font-semibold text-sm text-white">{founder.name}</span>
-          <span className="text-xs text-zinc-600">{founder.company}</span>
-          {founder.communityScore !== null && (
-            <span className="text-[10px] text-zinc-700">avg: {founder.communityScore.toFixed(1)}</span>
-          )}
-        </div>
-        <input
-          type="range" min={0} max={10} step={0.5} value={localValue}
-          onChange={e => setLocalValue(Number(e.target.value))}
-          onPointerDown={() => { dragging.current = true; }}
-          onPointerUp={e => { dragging.current = false; onChange(Number((e.target as HTMLInputElement).value)); }}
-          onKeyUp={e => onChange(Number((e.target as HTMLInputElement).value))}
-          className="w-full"
-        />
-        <div className="flex justify-between text-[10px] text-zinc-800 mt-1">
-          <span>0 delightful</span><span>5 tolerable</span><span>10 send help</span>
-        </div>
-      </div>
-      <div className="text-right flex-shrink-0 min-w-[44px]">
-        <div className={cn('text-xl font-black leading-none tabular-nums', scoreTextClass)}>{localValue.toFixed(1)}</div>
-        <div className="text-[10px] text-zinc-700 mt-0.5">🥃</div>
       </div>
     </div>
   );
