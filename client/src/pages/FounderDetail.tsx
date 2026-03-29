@@ -2,11 +2,16 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import type { FounderDetailResponse } from '@shared/types';
 import WhiskeyBar from '../components/WhiskeyBar';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, BarChart3, Loader2, Users } from 'lucide-react';
+
+const BREAKDOWN_LABELS: Record<string, string> = {
+  arrogance: 'Arrogance',
+  controversialTakes: 'Controversial Takes',
+  interruptionTendency: 'Interruption Tendency',
+  humblebragging: 'Humblebragging',
+  buzzwordDensity: 'Buzzword Density',
+};
 
 export default function FounderDetail() {
   const { id } = useParams<{ id: string }>();
@@ -37,22 +42,20 @@ export default function FounderDetail() {
       setFounder(prev => prev ? { ...prev, ...updated } : prev);
       setVoteSuccess(true);
       setTimeout(() => setVoteSuccess(false), 3000);
-    } catch {
-      // ignore
-    } finally {
-      setVoting(false);
-    }
+    } catch { /* ignore */ } finally { setVoting(false); }
   }
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center py-20 text-zinc-600 gap-3">
-      <div className="text-5xl">🥃</div>
-      <p className="text-sm">Loading...</p>
+    <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
+      <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-3xl animate-pulse-glow">
+        🥃
+      </div>
+      <p className="text-sm text-zinc-600">Loading...</p>
     </div>
   );
 
   if (error || !founder) return (
-    <div className="flex flex-col items-center justify-center py-20 gap-4">
+    <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
       <div className="text-5xl">💀</div>
       <p className="text-sm text-red-400">{error}</p>
       <Link to="/" className="text-sm">← Back to leaderboard</Link>
@@ -60,126 +63,140 @@ export default function FounderDetail() {
   );
 
   const breakdown = founder.scoreBreakdown;
-  const scoreColor =
-    founder.sassyScore >= 8 ? 'text-red-400' : founder.sassyScore >= 5 ? 'text-amber-400' : 'text-emerald-400';
+  const scoreTextClass = founder.sassyScore >= 8 ? 'text-red-400' : founder.sassyScore >= 5 ? 'text-amber-400' : 'text-emerald-400';
 
   return (
-    <div className="space-y-4">
-      <Link to="/" className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors no-underline">
-        <ArrowLeft className="w-3.5 h-3.5" />
-        Back to leaderboard
+    <div className="space-y-5">
+      <Link to="/" className="inline-flex items-center gap-1.5 text-xs text-zinc-600 hover:text-zinc-400 transition-colors no-underline">
+        <ArrowLeft className="w-3.5 h-3.5" /> Back to leaderboard
       </Link>
 
-      {/* Profile Card */}
-      <Card>
-        <CardContent className="pt-5 pb-5">
-          <div className="flex justify-between items-start gap-4 flex-wrap mb-4">
-            <div>
-              <h2 className="text-2xl font-bold text-amber-300">{founder.name}</h2>
-              <p className="text-sm text-zinc-500 mt-0.5">
-                {founder.title} · {founder.company}
-              </p>
-            </div>
-            <div className="text-right">
-              <div className={cn('text-5xl font-bold leading-none', scoreColor)}>
-                {founder.sassyScore.toFixed(1)}
+      {/* Profile Hero */}
+      <div className="relative overflow-hidden rounded-3xl mesh-bg border border-white/[0.06] p-8">
+        <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-amber-700/10 blur-3xl pointer-events-none" />
+        <div className="relative flex flex-col sm:flex-row justify-between gap-6">
+          <div className="flex items-start gap-5">
+            {founder.imageUrl ? (
+              <img
+                src={founder.imageUrl}
+                alt={founder.name}
+                className="w-20 h-20 rounded-2xl object-cover border-2 border-white/10 shadow-xl flex-shrink-0"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-amber-950 to-zinc-900 border border-white/10 flex items-center justify-center text-3xl font-black text-amber-700 flex-shrink-0">
+                {founder.name.charAt(0)}
               </div>
-              <div className="text-xs text-zinc-600 mt-1">🥃 official score</div>
+            )}
+            <div>
+              <h2 className="text-3xl font-black text-white leading-tight">{founder.name}</h2>
+              <p className="text-sm text-zinc-500 mt-1 font-medium">
+                {founder.title} · <span className="text-amber-600/70">{founder.company}</span>
+              </p>
+              <p className="text-sm text-zinc-400 mt-4 leading-relaxed max-w-xl">{founder.bio}</p>
             </div>
           </div>
-          <Separator className="mb-4" />
-          <p className="text-sm text-zinc-400 leading-relaxed">{founder.bio}</p>
-        </CardContent>
-      </Card>
+          <div className="flex-shrink-0 text-right sm:text-right">
+            <div className={cn('text-6xl font-black tabular-nums leading-none', scoreTextClass)}>
+              {founder.sassyScore.toFixed(1)}
+            </div>
+            <div className="text-xs text-zinc-600 mt-1 font-medium">🥃 official score</div>
+            {founder.communityVoteCount > 0 && (
+              <div className="mt-3 px-3 py-1.5 rounded-full glass text-xs text-zinc-500 font-medium inline-block">
+                {founder.communityScore?.toFixed(1)} community avg · {founder.communityVoteCount} votes
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Score Breakdown */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <BarChart3 className="w-4 h-4 text-amber-500" />
-            Sassy Score Breakdown
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <WhiskeyBar score={breakdown.arrogance} label="Arrogance" />
-          <WhiskeyBar score={breakdown.controversialTakes} label="Controversial Takes" />
-          <WhiskeyBar score={breakdown.interruptionTendency} label="Interruption Tendency" />
-          <WhiskeyBar score={breakdown.humblebragging} label="Humblebragging" />
-          <WhiskeyBar score={breakdown.buzzwordDensity} label="Buzzword Density" />
-        </CardContent>
-      </Card>
+      <div className="rounded-3xl bg-zinc-900/40 border border-white/[0.05] p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+            <BarChart3 className="w-3.5 h-3.5 text-amber-500" />
+          </div>
+          <h3 className="font-bold text-sm text-zinc-200">Sassy Score Breakdown</h3>
+        </div>
+        <div className="space-y-3.5">
+          {Object.entries(BREAKDOWN_LABELS).map(([key, label]) => (
+            <WhiskeyBar
+              key={key}
+              score={(breakdown as unknown as Record<string, number>)[key]}
+              label={label}
+              showValue
+              size="md"
+            />
+          ))}
+        </div>
+      </div>
 
       {/* Community Vote */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Users className="w-4 h-4 text-amber-500" />
-            Submit Your Rating
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-zinc-500">
-            How many 🥃 units would you need to enjoy a conversation with {founder.name.split(' ')[0]}?
-          </p>
+      <div className="rounded-3xl bg-zinc-900/40 border border-white/[0.05] p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+            <Users className="w-3.5 h-3.5 text-amber-500" />
+          </div>
+          <h3 className="font-bold text-sm text-zinc-200">Submit Your Rating</h3>
+        </div>
+        <p className="text-sm text-zinc-500 mb-5">
+          How many 🥃 units to enjoy a conversation with {founder.name.split(' ')[0]}?
+        </p>
 
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex-1 min-w-[200px]">
-              <input
-                type="range"
-                min={0}
-                max={10}
-                step={0.5}
-                value={vote}
-                onChange={e => setVote(Number(e.target.value))}
-                className="w-full"
-              />
-              <div className="flex justify-between text-[11px] text-zinc-700 mt-1">
-                <span>0 (delightful)</span>
-                <span>5 (tolerable)</span>
-                <span>10 (send help)</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="text-2xl font-bold text-amber-400 w-10 text-center">{vote}</span>
-              <Button
-                variant="amber"
-                size="sm"
-                onClick={handleVote}
-                disabled={voting}
-              >
-                {voting ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />...</> : 'Submit'}
-              </Button>
+        <div className="flex items-center gap-5 flex-wrap">
+          <div className="flex-1 min-w-[180px]">
+            <input
+              type="range" min={0} max={10} step={0.5} value={vote}
+              onChange={e => setVote(Number(e.target.value))}
+              className="w-full"
+            />
+            <div className="flex justify-between text-[11px] text-zinc-700 mt-1">
+              <span>0 (delightful)</span>
+              <span>5 (tolerable)</span>
+              <span>10 (send help)</span>
             </div>
           </div>
-
-          {voteSuccess && (
-            <div className="px-3 py-2 bg-emerald-950/60 border border-emerald-800/40 rounded-lg text-sm text-emerald-400">
-              ✓ Vote submitted! Thanks for rating.
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-zinc-800/80 border border-white/5 flex items-center justify-center">
+              <span className={cn('text-xl font-black tabular-nums', vote >= 8 ? 'text-red-400' : vote >= 5 ? 'text-amber-400' : 'text-emerald-400')}>
+                {vote}
+              </span>
             </div>
-          )}
+            <button
+              onClick={handleVote}
+              disabled={voting}
+              className={cn(
+                'px-6 py-2.5 rounded-2xl text-sm font-bold text-white border-none transition-all',
+                voting ? 'bg-zinc-700 opacity-60 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500 shadow-lg shadow-amber-900/30'
+              )}
+            >
+              {voting ? <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" />...</span> : 'Submit'}
+            </button>
+          </div>
+        </div>
 
-          {founder.communityVoteCount > 0 && (
-            <>
-              <Separator />
-              <div className="flex gap-6 flex-wrap">
-                <div>
-                  <div className="text-xl font-bold text-amber-400">
-                    {founder.communityScore?.toFixed(1) ?? 'n/a'}
-                  </div>
-                  <div className="text-xs text-zinc-600">community avg</div>
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-zinc-300">
-                    {founder.communityVoteCount}
-                  </div>
-                  <div className="text-xs text-zinc-600">total votes</div>
-                </div>
+        {voteSuccess && (
+          <div className="mt-4 px-4 py-3 rounded-xl bg-emerald-950/40 border border-emerald-800/30 text-sm text-emerald-400 font-medium">
+            ✓ Vote submitted! Thanks for rating.
+          </div>
+        )}
+
+        {founder.communityVoteCount > 0 && (
+          <div className="flex gap-8 mt-5 pt-5 border-t border-white/[0.05]">
+            <div>
+              <div className="text-2xl font-black text-amber-400 tabular-nums">
+                {founder.communityScore?.toFixed(1) ?? 'n/a'}
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+              <div className="text-xs text-zinc-700 mt-0.5">community avg</div>
+            </div>
+            <div>
+              <div className="text-2xl font-black text-zinc-300 tabular-nums">
+                {founder.communityVoteCount}
+              </div>
+              <div className="text-xs text-zinc-700 mt-0.5">total votes</div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
