@@ -6,6 +6,40 @@ import CarbonAd from '../components/CarbonAd';
 import { cn } from '@/lib/utils';
 import { BarChart3, Users, Flame, ChevronRight, LayoutGrid } from 'lucide-react';
 
+const PARTICLES = [
+  { tx: 75, ty: -65, emoji: '🔥', delay: 0 },
+  { tx: 90, ty: 0, emoji: '✨', delay: 35 },
+  { tx: 75, ty: 65, emoji: '🔥', delay: 70 },
+  { tx: 0, ty: -85, emoji: '⚡', delay: 15 },
+  { tx: -75, ty: -65, emoji: '💫', delay: 55 },
+  { tx: -90, ty: 0, emoji: '🔥', delay: 5 },
+  { tx: -75, ty: 65, emoji: '✨', delay: 45 },
+  { tx: 0, ty: 85, emoji: '🌟', delay: 25 },
+];
+
+function VoteParticles({ show, small = false }: { show: boolean; small?: boolean }) {
+  if (!show) return null;
+  const s = small ? 0.6 : 1;
+  return (
+    <>
+      {PARTICLES.map((p, i) => (
+        <span
+          key={i}
+          className="animate-particle"
+          style={{
+            '--tx': `${Math.round(p.tx * s)}px`,
+            '--ty': `${Math.round(p.ty * s)}px`,
+            animationDelay: `${p.delay}ms`,
+            fontSize: small ? '13px' : '18px',
+          } as React.CSSProperties}
+        >
+          {p.emoji}
+        </span>
+      ))}
+    </>
+  );
+}
+
 type ViewMode = 'official' | 'community' | 'pairwise' | 'compare';
 
 const MODES: { id: ViewMode; label: string; icon: React.ReactNode; hot?: boolean }[] = [
@@ -236,7 +270,7 @@ function PairwiseMode({ founders, onVoted }: { founders: Founder[]; onVoted: () 
       setVotesThisSession(v => v + 1);
       onVoted();
     } catch { /* continue */ }
-    setTimeout(() => { setAnimating(null); getNextPair(); }, 400);
+    setTimeout(() => { setAnimating(null); getNextPair(); }, 650);
   };
 
   if (showLeaderboard) {
@@ -308,12 +342,13 @@ function PairwiseMode({ founders, onVoted }: { founders: Founder[]; onVoted: () 
                   }
                 }}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-4 p-8 rounded-3xl border-2 transition-all duration-300 w-full text-center',
-                  isChosen ? 'bg-amber-950/40 border-amber-500/60 scale-[1.02] glow-amber' :
-                  isRejected ? 'bg-zinc-950/50 border-zinc-900 opacity-30 scale-95' :
-                  'bg-zinc-900/50 border-white/[0.06] hover:bg-zinc-800/60 hover:border-amber-900/30 hover:scale-[1.01]'
+                  'relative flex flex-col items-center justify-center gap-4 p-8 rounded-3xl border-2 w-full text-center',
+                  isChosen ? 'animate-vote-winner bg-amber-950/40 border-amber-500/60 glow-amber' :
+                  isRejected ? 'animate-vote-loser bg-zinc-950/50 border-zinc-900' :
+                  'transition-all duration-300 bg-zinc-900/50 border-white/[0.06] hover:bg-zinc-800/60 hover:border-amber-900/30 hover:scale-[1.01]'
                 )}
               >
+                <VoteParticles show={isChosen} />
                 {founder.imageUrl ? (
                   <img
                     src={founder.imageUrl}
@@ -337,10 +372,10 @@ function PairwiseMode({ founders, onVoted }: { founders: Founder[]; onVoted: () 
                   </div>
                 </div>
                 <div className={cn(
-                  'px-5 py-2 rounded-full text-xs font-bold border transition-all',
+                  'px-5 py-2 rounded-full text-xs font-bold border',
                   isChosen
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    : 'bg-white/[0.04] text-zinc-500 border-white/[0.06]'
+                    ? 'animate-badge-pop bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'transition-all bg-white/[0.04] text-zinc-500 border-white/[0.06]'
                 )}>
                   {isChosen ? '🔥 Sassier!' : 'Sassier →'}
                 </div>
@@ -523,7 +558,7 @@ function InlineVoting({ onVoted }: { onVoted: () => void }) {
       });
       onVoted();
     } catch { /* continue */ }
-    setTimeout(() => { setAnimating(null); getNextPair(); }, 400);
+    setTimeout(() => { setAnimating(null); getNextPair(); }, 650);
   };
 
   if (!pair) return (
@@ -550,12 +585,13 @@ function InlineVoting({ onVoted }: { onVoted: () => void }) {
               key={founder.id}
               onClick={() => { if (animating === null) handleVote(founder.id, pair[founderIndex === 0 ? 1 : 0].id); }}
               className={cn(
-                'flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 w-full text-center',
-                isChosen ? 'bg-amber-950/40 border-amber-500/60 scale-[1.02]' :
-                isRejected ? 'opacity-30 scale-95 border-zinc-900 bg-zinc-950/50' :
-                'bg-zinc-800/50 border-white/[0.06] hover:bg-zinc-800/80 hover:border-amber-900/40'
+                'relative flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 w-full text-center',
+                isChosen ? 'animate-vote-winner bg-amber-950/40 border-amber-500/60 glow-amber' :
+                isRejected ? 'animate-vote-loser border-zinc-900 bg-zinc-950/50' :
+                'transition-all duration-300 bg-zinc-800/50 border-white/[0.06] hover:bg-zinc-800/80 hover:border-amber-900/40'
               )}
             >
+              <VoteParticles show={isChosen} small />
               {founder.imageUrl ? (
                 <img src={founder.imageUrl} alt={founder.name} className="w-14 h-14 rounded-xl object-cover border border-white/10" />
               ) : (
@@ -569,7 +605,7 @@ function InlineVoting({ onVoted }: { onVoted: () => void }) {
               </div>
               <div className={cn(
                 'px-3 py-1 rounded-full text-[10px] font-bold border',
-                isChosen ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'text-zinc-600 border-white/[0.06] bg-transparent'
+                isChosen ? 'animate-badge-pop bg-amber-500/20 text-amber-300 border-amber-500/40' : 'transition-all text-zinc-600 border-white/[0.06] bg-transparent'
               )}>
                 {isChosen ? '🔥 Sassier!' : 'Sassier →'}
               </div>
