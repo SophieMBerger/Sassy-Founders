@@ -1,7 +1,31 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import Leaderboard from './pages/Leaderboard';
 import FounderDetail from './pages/FounderDetail';
+import Roadmap from './pages/Roadmap';
 import Disclaimer from './components/Disclaimer';
+
+function NavLink({ to, children }: { to: string; children: React.ReactNode }) {
+  const location = useLocation();
+  const active = location.pathname === to;
+  return (
+    <Link
+      to={to}
+      style={{
+        textDecoration: 'none',
+        padding: '6px 12px',
+        borderRadius: '6px',
+        fontSize: '13px',
+        fontWeight: active ? 600 : 400,
+        color: active ? '#fbbf24' : '#9d8460',
+        background: active ? '#2d1a05' : 'transparent',
+        border: `1px solid ${active ? '#d97706' : 'transparent'}`,
+        transition: 'all 0.15s',
+      }}
+    >
+      {children}
+    </Link>
+  );
+}
 
 export default function App() {
   return (
@@ -13,6 +37,7 @@ export default function App() {
           padding: '16px 24px',
           display: 'flex',
           alignItems: 'center',
+          justifyContent: 'space-between',
           gap: '12px',
         }}>
           <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -26,6 +51,10 @@ export default function App() {
               </p>
             </div>
           </Link>
+          <nav style={{ display: 'flex', gap: '4px' }}>
+            <NavLink to="/">Leaderboard</NavLink>
+            <NavLink to="/roadmap">Roadmap</NavLink>
+          </nav>
         </header>
 
         <Disclaimer />
@@ -34,6 +63,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Leaderboard />} />
             <Route path="/founders/:id" element={<FounderDetail />} />
+            <Route path="/roadmap" element={<Roadmap />} />
           </Routes>
         </main>
 
