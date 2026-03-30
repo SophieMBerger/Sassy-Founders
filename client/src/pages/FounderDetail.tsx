@@ -8,7 +8,7 @@ import ShareableCard from '../components/ShareableCard';
 import LoginModal from '../components/LoginModal';
 import { useAuth } from '../context/AuthContext';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, BarChart3, Loader2, Share2, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, Loader2, Share2, Users, ExternalLink } from 'lucide-react';
 
 const BREAKDOWN_LABELS: Record<string, string> = {
   arrogance: 'Arrogance',
@@ -249,6 +249,38 @@ export default function FounderDetail() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Whiskey Recommendation — Affiliate */}
+      <div className="rounded-3xl bg-gradient-to-br from-amber-950/20 to-zinc-900/40 border border-amber-500/10 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-base">
+            🥃
+          </div>
+          <h3 className="font-bold text-sm text-zinc-200">Recommended whiskey to survive this conversation</h3>
+        </div>
+
+        <p className="text-sm text-zinc-500 mb-4">
+          {founder.sassyScore >= 8
+            ? `With a ${founder.sassyScore.toFixed(1)}/10 sassy score, you'll need something strong. We recommend a premium single malt.`
+            : founder.sassyScore >= 5
+            ? `At ${founder.sassyScore.toFixed(1)}/10, a smooth bourbon should do the trick.`
+            : `Only ${founder.sassyScore.toFixed(1)}/10? A light whiskey sour will suffice.`}
+        </p>
+
+        <a
+          href={`https://www.reservebar.com/collections/whiskey?utm_source=sassyfounders&utm_medium=affiliate&utm_campaign=founder_profile&utm_content=${encodeURIComponent(founder.name)}`}
+          target="_blank"
+          rel="noopener noreferrer sponsored"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-amber-300 bg-amber-950/50 hover:bg-amber-950/80 border border-amber-500/30 hover:border-amber-500/50 transition-all no-underline shadow-lg shadow-amber-950/50"
+        >
+          Browse whiskey selection
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+
+        <p className="text-[10px] text-zinc-700 mt-3">
+          Affiliate link · SassyFounders may earn a commission
+        </p>
       </div>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
